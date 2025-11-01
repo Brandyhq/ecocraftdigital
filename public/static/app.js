@@ -1,56 +1,7 @@
 // ECOCRAFTDIGITAL - Digital Products Store
 
-// Sample products data
-const products = [
-  {
-    id: 1,
-    name: 'תבנית עיצוב לוגו מקצועי',
-    description: 'קובץ AI/PSD לעיצוב לוגו מקצועי עם 20 וריאציות שונות',
-    price: 149,
-    category: 'עיצוב',
-    image: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=400&h=300&fit=crop'
-  },
-  {
-    id: 2,
-    name: 'ספר אלקטרוני - מדריך שיווק דיגיטלי',
-    description: 'מדריך מקיף לשיווק דיגיטלי בעברית, 150 עמודים PDF',
-    price: 99,
-    category: 'חינוך',
-    image: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400&h=300&fit=crop'
-  },
-  {
-    id: 3,
-    name: 'פלאגינים ל-WordPress',
-    description: 'חבילת 10 פלאגינים מקצועיים לאתרי WordPress',
-    price: 199,
-    category: 'תוכנה',
-    image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=400&h=300&fit=crop'
-  },
-  {
-    id: 4,
-    name: 'תבניות סושיאל מדיה',
-    description: '50 תבניות עיצוב מוכנות לאינסטגרם ופייסבוק',
-    price: 79,
-    category: 'עיצוב',
-    image: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400&h=300&fit=crop'
-  },
-  {
-    id: 5,
-    name: 'קורס וידאו - פיתוח אפליקציות',
-    description: 'קורס מקיף בעברית לפיתוח אפליקציות מובייל, 30 שעות וידאו',
-    price: 299,
-    category: 'חינוך',
-    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=300&fit=crop'
-  },
-  {
-    id: 6,
-    name: 'מוזיקה ללא זכויות יוצרים',
-    description: 'ספרייה של 100 רצועות מוזיקה לשימוש מסחרי',
-    price: 249,
-    category: 'מדיה',
-    image: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&h=300&fit=crop'
-  }
-];
+// Products data (will be loaded from API)
+let products = [];
 
 // Cart state
 let cart = [];
@@ -58,15 +9,39 @@ let cart = [];
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
   loadCart();
-  renderProducts();
+  loadProducts();
   setupEventListeners();
   updateCartBadge();
 });
+
+// Load products from API
+async function loadProducts() {
+  try {
+    const response = await fetch('/api/products');
+    const data = await response.json();
+    
+    if (data.success && data.products) {
+      products = data.products;
+      renderProducts();
+    } else {
+      console.error('Failed to load products:', data.error);
+      showNotification('שגיאה בטעינת המוצרים', 'error');
+    }
+  } catch (error) {
+    console.error('Error loading products:', error);
+    showNotification('שגיאה בטעינת המוצרים', 'error');
+  }
+}
 
 // Render products
 function renderProducts() {
   const productsGrid = document.getElementById('products-grid');
   if (!productsGrid) return;
+  
+  if (products.length === 0) {
+    productsGrid.innerHTML = '<p class="text-gray-600 text-center col-span-full py-8">אין מוצרים להצגה כרגע</p>';
+    return;
+  }
   
   productsGrid.innerHTML = products.map(product => `
     <div class="product-card bg-white rounded-lg shadow-md overflow-hidden">
@@ -227,7 +202,7 @@ function closeCheckout() {
 }
 
 // Handle checkout
-function handleCheckout(event) {
+async function handleCheckout(event) {
   event.preventDefault();
   
   const formData = new FormData(event.target);
@@ -238,27 +213,52 @@ function handleCheckout(event) {
       phone: formData.get('phone')
     },
     items: cart,
-    total: calculateTotal(),
-    date: new Date().toISOString()
+    total: calculateTotal()
   };
   
-  console.log('Order submitted:', orderData);
-  
-  // Here you would send the order to your backend
-  // For now, we'll just show a success message
-  
-  showNotification('הזמנתך התקבלה בהצלחה! נשלח אליך מייל עם פרטי התשלום.');
-  
-  // Clear cart
-  cart = [];
-  saveCart();
-  updateCartBadge();
-  
-  // Close modal
-  closeCheckout();
-  
-  // Reset form
-  event.target.reset();
+  try {
+    // Show loading state
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin ml-2"></i> שולח הזמנה...';
+    
+    // Send order to backend
+    const response = await fetch('/api/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(orderData)
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showNotification('הזמנתך התקבלה בהצלחה! מספר הזמנה: ' + data.order.id);
+      
+      // Clear cart
+      cart = [];
+      saveCart();
+      updateCartBadge();
+      
+      // Close modal
+      closeCheckout();
+      
+      // Reset form
+      event.target.reset();
+    } else {
+      showNotification('שגיאה בשליחת ההזמנה: ' + data.error, 'error');
+    }
+    
+    // Restore button
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+    
+  } catch (error) {
+    console.error('Error submitting order:', error);
+    showNotification('שגיאה בשליחת ההזמנה', 'error');
+  }
 }
 
 // Save cart to localStorage
@@ -275,9 +275,10 @@ function loadCart() {
 }
 
 // Show notification
-function showNotification(message) {
+function showNotification(message, type = 'success') {
   const notification = document.createElement('div');
-  notification.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+  const bgColor = type === 'error' ? 'bg-red-500' : 'bg-green-500';
+  notification.className = `fixed top-4 left-1/2 transform -translate-x-1/2 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-50`;
   notification.textContent = message;
   
   document.body.appendChild(notification);

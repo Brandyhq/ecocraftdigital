@@ -1,8 +1,13 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
+import api from './api'
 
-const app = new Hono()
+type Bindings = {
+  DB: D1Database
+}
+
+const app = new Hono<{ Bindings: Bindings }>()
 
 // Enable CORS for API routes
 app.use('/api/*', cors())
@@ -10,28 +15,178 @@ app.use('/api/*', cors())
 // Serve static files from public directory
 app.use('/static/*', serveStatic({ root: './public' }))
 
-// API route example
-app.get('/api/products', (c) => {
-  return c.json({
-    products: [
-      {
-        id: 1,
-        name: 'תבנית עיצוב לוגו מקצועי',
-        description: 'קובץ AI/PSD לעיצוב לוגו מקצועי עם 20 וריאציות שונות',
-        price: 149,
-        category: 'עיצוב',
-        image: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=400&h=300&fit=crop'
-      },
-      {
-        id: 2,
-        name: 'ספר אלקטרוני - מדריך שיווק דיגיטלי',
-        description: 'מדריך מקיף לשיווק דיגיטלי בעברית, 150 עמודים PDF',
-        price: 99,
-        category: 'חינוך',
-        image: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400&h=300&fit=crop'
-      }
-    ]
-  })
+// Mount API routes
+app.route('/api', api)
+
+// Admin page
+app.get('/admin', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="he" dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>פאנל ניהול - ECOCRAFTDIGITAL</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="/static/styles.css" rel="stylesheet">
+    </head>
+    <body class="bg-gray-100">
+        <!-- Header -->
+        <header class="bg-white shadow-md">
+            <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-shield-alt text-green-600 text-2xl"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">פאנל ניהול</h1>
+                </div>
+                <a href="/" class="text-gray-600 hover:text-green-600">
+                    <i class="fas fa-home ml-2"></i>
+                    חזור לאתר
+                </a>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <div class="container mx-auto px-4 py-6">
+            <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+                <div class="flex gap-4">
+                    <button class="nav-btn px-6 py-2 rounded-lg font-bold" data-view="products">
+                        <i class="fas fa-box ml-2"></i>
+                        מוצרים
+                    </button>
+                    <button class="nav-btn px-6 py-2 rounded-lg font-bold" data-view="orders">
+                        <i class="fas fa-shopping-cart ml-2"></i>
+                        הזמנות
+                    </button>
+                </div>
+            </div>
+
+            <!-- Products View -->
+            <div id="products-view" class="view-section">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold">ניהול מוצרים</h2>
+                        <button onclick="showAddProduct()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                            <i class="fas fa-plus ml-2"></i>
+                            הוסף מוצר
+                        </button>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="py-3 px-4 text-right">מזהה</th>
+                                    <th class="py-3 px-4 text-right">שם</th>
+                                    <th class="py-3 px-4 text-right">קטגוריה</th>
+                                    <th class="py-3 px-4 text-right">מחיר</th>
+                                    <th class="py-3 px-4 text-right">סטטוס</th>
+                                    <th class="py-3 px-4 text-right">פעולות</th>
+                                </tr>
+                            </thead>
+                            <tbody id="products-table-body">
+                                <tr><td colspan="6" class="text-center py-8">טוען...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders View -->
+            <div id="orders-view" class="view-section" style="display: none;">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-2xl font-bold mb-6">הזמנות</h2>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="py-3 px-4 text-right">מזהה</th>
+                                    <th class="py-3 px-4 text-right">לקוח</th>
+                                    <th class="py-3 px-4 text-right">אימייל</th>
+                                    <th class="py-3 px-4 text-right">סכום</th>
+                                    <th class="py-3 px-4 text-right">סטטוס</th>
+                                    <th class="py-3 px-4 text-right">תשלום</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-table-body">
+                                <tr><td colspan="6" class="text-center py-8">טוען...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Modal -->
+        <div id="product-modal" class="modal">
+            <div class="modal-content max-w-2xl">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 id="product-modal-title" class="text-2xl font-bold">הוסף מוצר</h2>
+                    <button onclick="closeProductModal()" class="text-gray-500 hover:text-gray-700 text-2xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <form id="product-form" onsubmit="handleProductSubmit(event)" class="space-y-4">
+                    <input type="hidden" id="product-id">
+                    
+                    <div>
+                        <label class="block text-gray-700 font-bold mb-2">שם המוצר *</label>
+                        <input type="text" id="product-name" name="name" required 
+                               class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-green-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-700 font-bold mb-2">תיאור</label>
+                        <textarea id="product-description" name="description" rows="3"
+                                  class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-green-500"></textarea>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">מחיר (₪) *</label>
+                            <input type="number" id="product-price" name="price" step="0.01" required
+                                   class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-green-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 font-bold mb-2">קטגוריה *</label>
+                            <input type="text" id="product-category" name="category" required
+                                   class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-green-500">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-700 font-bold mb-2">קישור לתמונה</label>
+                        <input type="url" id="product-image" name="image"
+                               class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-green-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-700 font-bold mb-2">קישור לקובץ דיגיטלי</label>
+                        <input type="url" id="product-file-url" name="file_url"
+                               class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-green-500">
+                    </div>
+                    
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="product-active" name="active" checked
+                               class="w-5 h-5 text-green-600 rounded focus:ring-green-500">
+                        <label for="product-active" class="text-gray-700 font-bold">מוצר פעיל</label>
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700">
+                        <i class="fas fa-save ml-2"></i>
+                        שמור
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <script src="/static/admin.js"></script>
+    </body>
+    </html>
+  `)
 })
 
 // Main page
