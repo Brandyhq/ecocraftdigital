@@ -9,6 +9,18 @@ const api = new Hono<{ Bindings: Bindings }>()
 // Get all products
 api.get('/products', async (c) => {
   try {
+    // Debug: Check if DB exists
+    if (!c.env || !c.env.DB) {
+      return c.json({ 
+        success: false, 
+        error: 'Database not connected',
+        debug: {
+          hasEnv: !!c.env,
+          hasDB: !!(c.env && c.env.DB)
+        }
+      }, 500)
+    }
+    
     const { results } = await c.env.DB.prepare(`
       SELECT * FROM products WHERE active = 1 ORDER BY created_at DESC
     `).all()
@@ -16,7 +28,11 @@ api.get('/products', async (c) => {
     return c.json({ success: true, products: results })
   } catch (error) {
     console.error('Error fetching products:', error)
-    return c.json({ success: false, error: 'Failed to fetch products' }, 500)
+    return c.json({ 
+      success: false, 
+      error: 'Failed to fetch products',
+      message: error.message 
+    }, 500)
   }
 })
 
