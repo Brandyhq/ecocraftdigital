@@ -164,7 +164,7 @@ api.post('/admin/products', async (c) => {
     }
     
     const result = await c.env.DB.prepare(`
-      INSERT INTO products (name, description, price, category, image, digital_file_url)
+      INSERT INTO products (name, description, price, category, image_url, file_url)
       VALUES (?, ?, ?, ?, ?, ?)
     `).bind(name, description || '', price, category, image || '', digital_file_url || '').run()
     
@@ -195,7 +195,7 @@ api.put('/admin/products/:id', async (c) => {
     await c.env.DB.prepare(`
       UPDATE products 
       SET name = ?, description = ?, price = ?, category = ?, 
-          image = ?, digital_file_url = ?, active = ?, updated_at = CURRENT_TIMESTAMP
+          image_url = ?, file_url = ?, active = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(name, description, price, category, image, digital_file_url, active, id).run()
     
