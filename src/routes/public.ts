@@ -76,7 +76,7 @@ publicApi.post('/orders', async (c) => {
   const customer = await db.prepare('SELECT id FROM customers WHERE email = ?').bind(email).first<{ id: number }>()
 
   const order = await db
-    .prepare(`INSERT INTO orders (customer_id, total_amount, status, payment_method) VALUES (?, ?, 'pending', 'paypal')`)
+    .prepare(`INSERT INTO orders (customer_id, total_amount, status) VALUES (?, ?, 'pending')`)
     .bind(customer!.id, total)
     .run()
   const orderId = order.meta.last_row_id

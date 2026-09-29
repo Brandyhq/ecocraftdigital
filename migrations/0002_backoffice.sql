@@ -117,5 +117,13 @@ INSERT INTO order_items (order_id, product_id, product_name, quantity, price)
 UPDATE orders SET status = 'paid', paid_at = COALESCE(paid_at, created_at), download_token = lower(hex(randomblob(24)))
   WHERE payment_status = 'paid' AND status NOT IN ('cancelled', 'refunded');
 
--- SECURITY: seed.sql used to ship a default admin ('admin' / 'admin123'). Remove it if present.
-DELETE FROM admin_users WHERE password_hash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+-- SECURITY: the old admin table came from seed.sql with a default account ('admin' / 'admin123'), was never
+-- used for authentication, and some deployments created it with different columns. Recreate it empty.
+DROP TABLE IF EXISTS admin_users;
+CREATE TABLE admin_users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
