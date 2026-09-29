@@ -144,6 +144,15 @@ async function paidOrder(db: D1Database, token: string) {
   return db.prepare("SELECT id FROM orders WHERE download_token = ? AND status IN ('paid','delivered')").bind(token).first<{ id: number }>()
 }
 
+/**
+ * Delivery data per order line. The live product wins (so customers get updated files); if the
+ * product was deleted, the snapshot stored on the order line is used.
+ */
+const DELIVERY_SQL = `SELECT oi.id AS item_id, oi.product_name,
+    COALESCE(p.file_id, oi.file_id) AS file_id,
+    COALESCE(NULLIF(p.file_url, ''), oi.file_url, '') AS file_url
+  FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?`
+
 const page = (title: string, body: string) => `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)}</title>
 <link rel="stylesheet" href="/static/store.css"></head><body><main><div class="wrap"><div class="success">${body}</div></div></main></body></html>`
@@ -151,25 +160,19 @@ const page = (title: string, body: string) => `<!doctype html><html lang="he" di
 publicFiles.get('/download/:token', async (c) => {
   const order = await paidOrder(c.env.DB, c.req.param('token'))
   if (!order) return c.html(page('קישור לא תקין', '<h1>הקישור אינו תקף</h1><p>ההזמנה טרם אושרה או שהקישור שגוי.</p>'), 404)
-  const { results } = await c.env.DB.prepare(
-    `SELECT p.id, oi.product_name, p.file_url, p.file_id FROM order_items oi
-     JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ? AND (p.file_url != '' OR p.file_id IS NOT NULL)`
-  )
-    .bind(order.id)
-    .all<{ id: number; product_name: string }>()
+  const { results } = await c.env.DB.prepare(DELIVERY_SQL).bind(order.id).all<{ item_id: number; product_name: string; file_id: string | null; file_url: string }>()
   const rows = results
-    .map((r) => `<div class="dl-row"><div class="dl-info"><h4>${escapeHtml(r.product_name)}</h4><a class="btn btn-primary btn-sm" href="/download/${escapeHtml(c.req.param('token'))}/${r.id}">הורדה</a></div></div>`)
+    .filter((r) => r.file_id || r.file_url)
+    .map((r) => `<div class="dl-row"><div class="dl-info"><h4>${escapeHtml(r.product_name)}</h4><a class="btn btn-primary btn-sm" href="/download/${escapeHtml(c.req.param('token'))}/${r.item_id}">הורדה</a></div></div>`)
     .join('')
   return c.html(page('ההורדות שלך', `<h1>ההורדות שלך</h1><div class="dl-list">${rows || '<p>הקבצים יתווספו בקרוב.</p>'}</div>`))
 })
 
-publicFiles.get('/download/:token/:productId', async (c) => {
+publicFiles.get('/download/:token/:itemId', async (c) => {
   const order = await paidOrder(c.env.DB, c.req.param('token'))
   if (!order) return c.notFound()
-  const product = await c.env.DB.prepare(
-    `SELECT p.file_url, p.file_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ? AND p.id = ?`
-  )
-    .bind(order.id, c.req.param('productId'))
+  const product = await c.env.DB.prepare(`${DELIVERY_SQL} AND oi.id = ?`)
+    .bind(order.id, c.req.param('itemId'))
     .first<{ file_url: string; file_id: string | null }>()
   if (!product) return c.notFound()
   if (product.file_id) {

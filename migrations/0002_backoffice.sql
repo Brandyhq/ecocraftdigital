@@ -51,7 +51,10 @@ CREATE TABLE order_items (
   product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
   product_name TEXT NOT NULL,                    -- snapshot: survives product edits/deletes
   quantity INTEGER NOT NULL CHECK (quantity > 0),
-  price REAL NOT NULL
+  price REAL NOT NULL,
+  -- delivery snapshot, filled when the product is deleted so paid orders can still be fulfilled
+  file_url TEXT NOT NULL DEFAULT '',
+  file_id TEXT
 );
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_order_items_product_id ON order_items(product_id);
@@ -96,6 +99,23 @@ CREATE TABLE login_attempts (
   created_at INTEGER NOT NULL                    -- unix seconds
 );
 CREATE INDEX idx_login_attempts_ip ON login_attempts(ip, created_at);
+
+-- Carry existing data over. Legacy products come in HIDDEN (active = 0): they were sample/legacy
+-- catalog entries, and the admin can re-enable any of them. Ids are preserved so order lines still match.
+-- (Only columns guaranteed by 0001 are read; legacy image/file links stay in legacy_products.)
+INSERT OR IGNORE INTO categories (id, name, sort_order)
+  SELECT 'legacy-' || lower(hex(category)), category, 100
+  FROM (SELECT DISTINCT category FROM legacy_products WHERE category IS NOT NULL AND category != '');
+INSERT INTO products (id, slug, name, description, price, category_id, active, sort_order)
+  SELECT id, 'legacy-' || id, name, COALESCE(description, ''), price,
+         CASE WHEN category IS NULL OR category = '' THEN NULL ELSE 'legacy-' || lower(hex(category)) END, 0, 1000 + id
+  FROM legacy_products;
+INSERT INTO order_items (order_id, product_id, product_name, quantity, price)
+  SELECT loi.order_id, loi.product_id, lp.name, loi.quantity, loi.price
+  FROM legacy_order_items loi JOIN legacy_products lp ON lp.id = loi.product_id;
+-- Orders already marked paid in the old panel keep that state and get a personal download token.
+UPDATE orders SET status = 'paid', paid_at = COALESCE(paid_at, created_at), download_token = lower(hex(randomblob(24)))
+  WHERE payment_status = 'paid' AND status NOT IN ('cancelled', 'refunded');
 
 -- SECURITY: seed.sql used to ship a default admin ('admin' / 'admin123'). Remove it if present.
 DELETE FROM admin_users WHERE password_hash = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';

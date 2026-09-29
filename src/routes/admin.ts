@@ -201,8 +201,14 @@ admin.put('/products/:id', async (c) => {
 })
 
 admin.delete('/products/:id', async (c) => {
-  // Order history keeps its own name/price snapshot, so deleting a product is safe.
-  const res = await c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(c.req.param('id')).run()
+  // Order lines keep a name/price snapshot and (here) a delivery-file snapshot, so paid orders stay fulfillable.
+  const id = c.req.param('id')
+  const [, res] = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE order_items SET file_url = COALESCE((SELECT file_url FROM products WHERE id = ?1), ''), file_id = (SELECT file_id FROM products WHERE id = ?1) WHERE product_id = ?1`
+    ).bind(id),
+    c.env.DB.prepare('DELETE FROM products WHERE id = ?').bind(id)
+  ])
   return res.meta.changes ? c.json({ success: true }) : c.json({ success: false, error: 'המוצר לא נמצא' }, 404)
 })
 
