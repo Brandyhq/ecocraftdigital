@@ -1,0 +1,7 @@
+SESSION_SECRET=change-me
+SETUP_TOKEN=change-me
+# Optional: automatic PayPal payments
+PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
+PAYPAL_ENV=sandbox
+PAYPAL_WEBHOOK_ID=

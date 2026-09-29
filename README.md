@@ -1,368 +1,46 @@
-# ECOCRAFTDIGITAL - חנות מוצרים דיגיטליים מתקדמת
+# EcoCraft Digital
 
-## סקירה כללית
+חנות מוצרים דיגיטליים בעברית (RTL) + בק אופיס מאובטח. Cloudflare Pages + Hono + D1.
 
-**ECOCRAFTDIGITAL** היא פלטפורמה מלאה למכירת מוצרים דיגיטליים איכותיים לקהל הישראלי. האתר כולל ממשק לקוחות מתקדם, פאנל ניהול מקצועי, מסד נתונים מלא והכנה לשערי תשלום.
+## מבנה
+| נתיב | תפקיד |
+|---|---|
+| `public/static/store.js`, `store.css` | החזית (מבוססת האתר המקורי). הנתונים מוזרקים מהשרת ל-`#appdata` |
+| `public/static/admin.js`, `admin.css` | הבק אופיס (`/admin`) – SPA ללא תלויות, מותאם ל-CSP קפדני |
+| `src/routes/public.ts` | `/api/site`, `/api/orders`, `/media/:id`, `/download/:token` |
+| `src/routes/admin.ts` | כל `/api/admin/*` (מוגן) |
+| `src/lib/` | הצפנה/סשן (`crypto`, `auth`), ולידציה, נתוני האתר |
+| `migrations/` | `0001` סכמה מקורית, `0002` סכמת הבק אופיס (הטבלאות הישנות נשמרות כ-`legacy_*`) |
 
-## 🎯 תכונות מושלמות
-
-### 1. ממשק לקוחות
-- ✅ עיצוב מודרני ומותאם לעברית (RTL)
-- ✅ ממשק רספונסיבי למובייל וטאבלט
-- ✅ עגלת קניות מתקדמת עם שמירה ב-localStorage
-- ✅ תהליך הזמנה מלא עם שמירה למסד נתונים
-- ✅ טעינת מוצרים דינמית מ-API
-- ✅ הודעות משוב למשתמש
-
-### 2. מסד נתונים Cloudflare D1
-- ✅ 5 טבלאות: products, customers, orders, order_items, admin_users
-- ✅ מיגרציות מובנות
-- ✅ 6 מוצרי דוגמה מוכנים
-- ✅ אינדקסים לביצועים מיטביים
-- ✅ תמיכה מלאה בפיתוח מקומי (--local mode)
-
-### 3. API מלא
-- ✅ `GET /api/products` - קבלת כל המוצרים הפעילים
-- ✅ `GET /api/products/:id` - קבלת מוצר בודד
-- ✅ `POST /api/orders` - יצירת הזמנה חדשה
-- ✅ `GET /api/orders/:id` - קבלת פרטי הזמנה
-- ✅ `GET /api/admin/products` - כל המוצרים (כולל לא פעילים)
-- ✅ `POST /api/admin/products` - הוספת מוצר
-- ✅ `PUT /api/admin/products/:id` - עדכון מוצר
-- ✅ `DELETE /api/admin/products/:id` - מחיקה רכה
-- ✅ `GET /api/admin/orders` - כל ההזמנות
-- ✅ `PUT /api/admin/orders/:id` - עדכון סטטוס הזמנה
-
-### 4. פאנל ניהול מקצועי
-- ✅ דף ניהול ב-`/admin`
-- ✅ טבלת מוצרים עם הוספה, עריכה ומחיקה
-- ✅ טבלת הזמנות עם עדכון סטטוס תשלום
-- ✅ ממשק אינטואיטיבי בעברית
-- ✅ Modal לעריכת מוצרים
-
-### 5. הכנה לשערי תשלום
-- ✅ מסמך מפורט `PAYMENT_INTEGRATION.md`
-- ✅ הוראות להוספת Tranzila, PayPal, Stripe
-- ✅ דוגמאות קוד מוכנות
-- ✅ הסבר על Webhooks
-
-## 🌐 URLs
-
-### סביבת פיתוח (Sandbox)
-- **דף ראשי**: https://3000-iav8deovnvnd7puxrzodo-82b888ba.sandbox.novita.ai
-- **פאנל ניהול**: https://3000-iav8deovnvnd7puxrzodo-82b888ba.sandbox.novita.ai/admin
-- **API**: https://3000-iav8deovnvnd7puxrzodo-82b888ba.sandbox.novita.ai/api/
-
-### API Endpoints דוגמה
+## הרצה מקומית
 ```bash
-# קבלת כל המוצרים
-curl https://3000-iav8deovnvnd7puxrzodo-82b888ba.sandbox.novita.ai/api/products
-
-# יצירת הזמנה
-curl -X POST https://3000-iav8deovnvnd7puxrzodo-82b888ba.sandbox.novita.ai/api/orders \
-  -H "Content-Type: application/json" \
-  -d '{"customer":{"name":"יוסי","email":"yossi@example.com"},"items":[{"id":1,"quantity":1,"price":149}],"total":149}'
+npm ci
+cp .dev.vars.example .dev.vars      # ערכי SESSION_SECRET ו-SETUP_TOKEN
+npm run db:migrate:local && npm run db:seed
+npm run build && npm run dev:sandbox   # http://localhost:3000  ,  /admin
 ```
 
-### ייצור (לאחר פריסה)
-- יוגדר לאחר פריסה ל-Cloudflare Pages
+## פריסה
+1. `wrangler pages secret put SESSION_SECRET` (מחרוזת אקראית ארוכה) ו-`wrangler pages secret put SETUP_TOKEN`.
+2. `npm run db:migrate:prod` ואז (פעם אחת) `npm run db:seed:prod`.
+3. `npm run deploy`, ואז כנסי ל-`/admin` וצרי את חשבון המנהלת הראשון עם קוד ההתקנה. אחרי היצירה אפשר להסיר את `SETUP_TOKEN`.
 
-## 🗄️ מבנה מסד הנתונים
+## אבטחה
+- סיסמאות: PBKDF2-SHA256; סשן: עוגיית HttpOnly + SameSite=Strict חתום ב-HMAC, בטל אוטומטית בהחלפת סיסמה; הגבלת ניסיונות התחברות; כותרת `X-Requested-With` חובה בבקשות משנות.
+- מחירים בהזמנה מחושבים בשרת בלבד. קבצים דיגיטליים פרטיים ונמסרים רק בקישור אישי אחרי שההזמנה סומנה "שולמה".
+- מיגרציה `0002` מעבירה מוצרים והזמנות קיימים (מוצרים ישנים נכנסים כמוסתרים, הזמנות ששולמו שומרות סטטוס ומקבלות קישור הורדה). \n- המיגרציה מוחקת את משתמש ברירת המחדל `admin/admin123` של הגרסה הישנה, אם קיים.
 
-### טבלאות
+## תשלום PayPal אוטומטי
+1. ב-[PayPal Developer](https://developer.paypal.com) צרי אפליקציית REST (בסביבת sandbox לבדיקה, live לפרודקשן).
+2. הגדירי secrets: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV` (`live` בפרודקשן; ברירת מחדל sandbox), ואופציונלית `PAYPAL_WEBHOOK_ID`.
+3. `npm run db:migrate:prod` (מיגרציה `0003`).
+4. ב-PayPal הוסיפי webhook לכתובת `https://<הדומיין>/api/paypal/webhook` עם האירועים `CHECKOUT.ORDER.APPROVED` ו-`PAYMENT.CAPTURE.COMPLETED` (רשת ביטחון למקרה שהלקוחה סגרה את הדפדפן לפני החזרה לאתר).
 
-**products** - מוצרים
-```sql
-id, name, description, price, category, image, digital_file_url, active, created_at, updated_at
-```
+הזרימה: לקוחה ממלאת פרטים ← נוצרת הזמנה `pending` + הזמנת PayPal ב-ILS (המחיר מחושב בשרת) ← אישור ב-PayPal ← `/paypal/return` שואל את PayPal מה המצב, מבצע capture, בודק שהסכום והמטבע תואמים, ורק אז מסמן `paid` ומעביר אותה לקישור ההורדה האישי.
+בלי הגדרת המשתנים – האתר חוזר לתהליך הידני (קישורי PayPal.me + סימון "שולמה" בבק אופיס).
 
-**customers** - לקוחות
-```sql
-id, name, email, phone, created_at
-```
-
-**orders** - הזמנות
-```sql
-id, customer_id, total_amount, status, payment_method, payment_status, created_at, updated_at
-```
-
-**order_items** - פריטי הזמנה
-```sql
-id, order_id, product_id, quantity, price
-```
-
-**admin_users** - משתמשי ניהול
-```sql
-id, username, password_hash, email, created_at
-```
-
-### פעולות מסד נתונים
-
-```bash
-# הרצת מיגרציות מקומית
-npm run db:migrate:local
-
-# טעינת נתוני דוגמה
-npm run db:seed
-
-# איפוס מסד נתונים מקומי
-npm run db:reset
-
-# פתיחת קונסולת SQL מקומית
-npm run db:console:local
-
-# פעולות לייצור (דורש API token)
-npm run db:migrate:prod
-npm run db:console:prod
-```
-
-## 📦 התקנה ופיתוח
-
-### התקנה ראשונית
-```bash
-cd /home/user/webapp
-npm install
-```
-
-### פיתוח מקומי
-```bash
-# בניית הפרויקט
-npm run build
-
-# הגדרת מסד נתונים מקומי
-npm run db:migrate:local
-npm run db:seed
-
-# הפעלת שרת פיתוח עם PM2
-pm2 start ecosystem.config.cjs
-
-# בדיקת שהשרת פועל
-curl http://localhost:3000
-```
-
-### פקודות שימושיות
-```bash
-# רשימת שירותים
-pm2 list
-
-# צפייה בלוגים
-pm2 logs webapp --nostream
-
-# הפעלה מחדש
-fuser -k 3000/tcp && pm2 restart webapp
-
-# עצירה
-pm2 delete webapp
-
-# ניקוי פורט
-npm run clean-port
-```
-
-## 🚀 פריסה ל-Cloudflare Pages
-
-### צעדים לפריסה
-
-#### 1. הכנה
-```bash
-# ודא שהפרויקט בנוי
-npm run build
-```
-
-#### 2. הגדרת Cloudflare API Key
-**חשוב**: לפני פריסה, יש להגדיר את מפתח ה-API של Cloudflare:
-- עבור ל-Deploy tab בממשק
-- הוסף את ה-Cloudflare API Token שלך
-- חזור והפעל את הפקודה `setup_cloudflare_api_key`
-
-#### 3. יצירת D1 Database בייצור
-```bash
-# צור את מסד הנתונים
-npx wrangler d1 create ecocraft-production
-
-# העתק את ה-database_id שהתקבל ל-wrangler.jsonc
-```
-
-#### 4. עדכון wrangler.jsonc
-ודא ש-`database_id` מוגדר נכון ב-`wrangler.jsonc`:
-```jsonc
-{
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "ecocraft-production",
-      "database_id": "your-actual-database-id"
-    }
-  ]
-}
-```
-
-#### 5. הרצת מיגרציות לייצור
-```bash
-npm run db:migrate:prod
-```
-
-#### 6. יצירת פרויקט Cloudflare Pages
-```bash
-npx wrangler pages project create ecocraftdigital \
-  --production-branch main \
-  --compatibility-date 2025-11-01
-```
-
-#### 7. פריסה
-```bash
-npm run deploy:prod
-```
-
-#### 8. הגדרת Secrets (אם נדרש)
-```bash
-# לשערי תשלום
-npx wrangler secret put STRIPE_SECRET_KEY --project-name ecocraftdigital
-npx wrangler secret put PAYPAL_SECRET --project-name ecocraftdigital
-```
-
-## 💳 אינטגרציה עם שערי תשלום
-
-ראה קובץ `PAYMENT_INTEGRATION.md` למדריך מפורט על:
-- Tranzila (מומלץ לישראל)
-- PayPal
-- Stripe
-
-דוגמה מהירה:
-```typescript
-// הוספת endpoint לתשלום ב-src/api.tsx
-api.post('/payment/process', async (c) => {
-  // לוגיקת תשלום כאן
-})
-```
-
-## 🎨 התאמה אישית
-
-### שינוי צבעים
-ערוך את `public/static/styles.css`:
-```css
-:root {
-  --primary-color: #10b981;    /* ירוק עיקרי */
-  --secondary-color: #059669;  /* ירוק משני */
-}
-```
-
-### הוספת מוצרים
-1. **דרך פאנל ניהול** (`/admin`):
-   - לחץ "הוסף מוצר"
-   - מלא פרטים
-   - שמור
-
-2. **דרך SQL**:
-```bash
-npm run db:console:local
-```
-```sql
-INSERT INTO products (name, description, price, category, image) 
-VALUES ('מוצר חדש', 'תיאור', 99, 'קטגוריה', 'url');
-```
-
-## 📁 מבנה פרויקט
-
-```
-webapp/
-├── src/
-│   ├── index.tsx          # דף ראשי + דף admin
-│   ├── api.tsx            # כל ה-API endpoints
-│   └── renderer.tsx       # Renderer helpers
-├── public/
-│   └── static/
-│       ├── app.js         # לוגיקת עגלה והזמנות
-│       ├── admin.js       # לוגיקת פאנל ניהול
-│       └── styles.css     # עיצוב מותאם
-├── migrations/
-│   └── 0001_initial_schema.sql  # סכמת DB
-├── dist/                  # קבצים מקומפלים
-├── seed.sql              # נתוני דוגמה
-├── ecosystem.config.cjs   # הגדרות PM2
-├── package.json           # תלויות
-├── wrangler.jsonc         # הגדרות Cloudflare
-├── PAYMENT_INTEGRATION.md # מדריך שערי תשלום
-└── README.md              # מסמך זה
-```
-
-## 🎯 תכונות להוספה בעתיד
-
-### 1. מערכת משתמשים
-- הרשמה והתחברות
-- פרופיל משתמש
-- היסטוריית רכישות
-
-### 2. הורדת קבצים
-- מערכת הורדת מוצרים דיגיטליים
-- קישורי הורדה ייחודיים
-- הגבלת מספר הורדות
-
-### 3. שליחת מיילים אוטומטית
-- אישור הזמנה
-- קישור להורדה
-- חשבונית
-
-### 4. ניתוח ודוחות
-- Google Analytics
-- מעקב אחר מכירות
-- דוחות הכנסות
-
-### 5. שיפורי UX
-- חיפוש מוצרים
-- סינון לפי קטגוריה
-- מיון לפי מחיר
-- רשימת משאלות
-
-## 🔧 פתרון בעיות נפוצות
-
-### הפורט 3000 תפוס
-```bash
-npm run clean-port
-```
-
-### מסד הנתונים ריק
-```bash
-npm run db:reset
-```
-
-### שגיאות build
-```bash
-rm -rf node_modules dist
-npm install
-npm run build
-```
-
-### בעיות PM2
-```bash
-pm2 delete all
-pm2 start ecosystem.config.cjs
-```
-
-## 📊 מידע טכני
-
-- **Framework**: Hono 4.10.4
-- **Runtime**: Cloudflare Workers
-- **Database**: Cloudflare D1 (SQLite)
-- **Build Tool**: Vite 6.4.1
-- **CLI**: Wrangler 4.45.3
-- **Styling**: Tailwind CSS (CDN)
-- **Icons**: Font Awesome 6.4.0
-
-## 📝 רישיונות
-
-- קוד: כל הזכויות שמורות © 2025 ECOCRAFTDIGITAL
-- תמונות: Unsplash (חינמי לשימוש)
-- ספריות: ראה רישיונות ב-package.json
-
-## 📞 תמיכה
-
-לשאלות ותמיכה, פנה דרך:
-- GitHub Issues
-- דוא"ל: admin@ecocraftdigital.com
-
----
-
-**גרסה**: 2.0.0  
-**עדכון אחרון**: 2025-11-01  
-**סטטוס**: ✅ פעיל ומוכן לייצור
-# Auto-deployment trigger - Sat Nov  1 16:52:35 UTC 2025
+## מגבלות ידועות
+- תמונות וקבצים נשמרים ב-D1 (עד ~1.5MB לתמונה, 1.9MB לקובץ). לקבצים גדולים – קישור חיצוני, או מעבר ל-R2.
+- אין שליחת מייל אוטומטית.
+- החזרים (refund) ב-PayPal לא מסתנכרנים אוטומטית – יש לעדכן סטטוס ידנית בבק אופיס.
+- אם PayPal חייב סכום שאינו תואם להזמנה, ההזמנה נשארת `pending` ונרשמת שגיאה בלוג — יש לבדוק ידנית.
