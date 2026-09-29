@@ -285,6 +285,12 @@ function checkoutPage(){
 /* ---------- success / about ---------- */
 function successPage(){
   const o=orderResult;
+  if(o&&o.paid)return `<main><div class="wrap"><div class="success">
+    <div class="checkwrap">${iconCheck()}</div><h1>התשלום התקבל — תודה!</h1>
+    <p>הקבצים שלך מוכנים להורדה. שמרי את הקישור — הוא אישי וזמין תמיד.</p>
+    <div style="margin-top:22px"><a class="btn btn-primary" href="${esc(o.downloadUrl)}">להורדת הקבצים</a></div>
+    <div style="margin-top:22px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><button class="btn btn-ghost" data-nav="shop">להמשך קנייה</button><button class="btn btn-ghost" data-nav="home">לדף הבית</button></div>
+  </div></div></main>`;
   if(!o)return `<main><div class="wrap"><div class="success"><h1>לא נמצאה הזמנה</h1><div style="margin-top:26px"><button class="btn btn-primary" data-nav="shop">לחנות</button></div></div></div></main>`;
   const rows=o.items.map(i=>`
     <div class="dl-row"><div class="dl-info"><h4>${esc(i.name)}${i.quantity>1?' × '+i.quantity:''}</h4>
@@ -347,6 +353,7 @@ function bind(){
     placing=true;po.disabled=true;po.textContent='שולחת…';
     try{
       const o=await placeOrder({name,email,phone});
+      if(o.approveUrl){location.href=o.approveUrl;return;} /* automatic PayPal: the cart is cleared when the customer returns paid */
       orderResult={...o,email};cart={};saveCart();nav('success');
     }catch(err){toast(esc(err.message),true);po.disabled=false;po.textContent='שליחת הזמנה ומעבר לתשלום';}
     finally{placing=false;}
@@ -375,4 +382,16 @@ function toggleTheme(){
 /* ---------- boot ---------- */
 (function(){try{const t=localStorage.getItem('ec_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
 if(DATA.design)applyTheme();
+/* returning from PayPal: ?paid=<download token> after a captured payment, ?payment=cancelled|failed|pending otherwise */
+const q=new URLSearchParams(location.search);
+let bootToast=null;
+if(q.get('paid')){
+  orderResult={paid:true,downloadUrl:'/download/'+encodeURIComponent(q.get('paid'))};
+  cart={};saveCart();route={name:'success'};
+}else if(q.get('payment')){
+  const m={cancelled:'התשלום בוטל — העגלה שלך נשמרה.',pending:'התשלום עדיין בעיבוד. נעדכן ברגע שיאושר.',failed:'לא הצלחנו לאמת את התשלום. אם חויבת, פני אלינו עם מספר ההזמנה.'};
+  bootToast=[m[q.get('payment')]||m.failed,q.get('payment')!=='cancelled'&&q.get('payment')!=='pending'];
+}
+if(q.get('paid')||q.get('payment')){try{history.replaceState(null,'',location.pathname);}catch(e){}}
 render();
+if(bootToast)toast(bootToast[0],bootToast[1]);

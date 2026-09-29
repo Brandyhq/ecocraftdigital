@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../env'
 import { escapeHtml } from '../lib/html'
+import { createPayPalOrder, paypalEnabled, settlePayPalOrder, verifyWebhook } from '../lib/paypal'
 import { getSiteData } from '../lib/site'
 import { isEmail, isObject, text } from '../lib/validate'
 
@@ -13,6 +14,19 @@ export const publicFiles = new Hono<AppEnv>()
 const blob = (data: ArrayBuffer | number[]) => (Array.isArray(data) ? new Uint8Array(data) : data)
 
 publicApi.get('/site', async (c) => c.json({ success: true, ...(await getSiteData(c.env.DB)) }))
+
+/** PayPal server-to-server notifications. Handling is idempotent and re-checks state with PayPal itself. */
+publicApi.post('/paypal/webhook', async (c) => {
+  if (!paypalEnabled(c.env)) return c.json({ success: false }, 404)
+  const event = await c.req.json().catch(() => null)
+  if (!isObject(event)) return c.json({ success: false }, 400)
+  if (c.env.PAYPAL_WEBHOOK_ID && !(await verifyWebhook(c.env, c.req.raw.headers, event))) return c.json({ success: false }, 401)
+  const resource = isObject(event.resource) ? event.resource : {}
+  const related = isObject(resource.supplementary_data) && isObject(resource.supplementary_data.related_ids) ? resource.supplementary_data.related_ids : {}
+  const paypalOrderId = event.event_type === 'CHECKOUT.ORDER.APPROVED' ? resource.id : related.order_id
+  if (typeof paypalOrderId === 'string') await settlePayPalOrder(c.env, paypalOrderId)
+  return c.json({ success: true })
+})
 
 const MAX_LINES = 20
 const MAX_QTY = 10
@@ -74,15 +88,44 @@ publicApi.post('/orders', async (c) => {
     )
   )
 
+  // Automatic PayPal checkout when configured; otherwise the storefront falls back to per-product PayPal.me links.
+  let approveUrl: string | null = null
+  if (paypalEnabled(c.env)) {
+    try {
+      const brand = ((await getSiteData(db)).design as { brandName?: string }).brandName || 'EcoCraft Digital'
+      const pp = await createPayPalOrder(
+        c.env,
+        { id: orderId, total, items: lines.map((l) => ({ name: l.name, price: l.price, quantity: l.quantity })) },
+        new URL(c.req.url).origin,
+        brand
+      )
+      await db.prepare('UPDATE orders SET paypal_order_id = ? WHERE id = ?').bind(pp.paypalOrderId, orderId).run()
+      approveUrl = pp.approveUrl
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   return c.json({
     success: true,
     order: {
       id: orderId,
       total,
+      approveUrl,
       items: lines.map((l) => ({ name: l.name, price: l.price, quantity: l.quantity, paypalUrl: l.paypal_url }))
     }
   })
 })
+
+/** Where PayPal sends the customer after approving: capture server-side, then hand them to the storefront. */
+publicFiles.get('/paypal/return', async (c) => {
+  const paypalOrderId = c.req.query('token') ?? ''
+  const result = paypalOrderId && paypalEnabled(c.env) ? await settlePayPalOrder(c.env, paypalOrderId).catch(() => 'failed' as const) : 'failed'
+  if (result !== 'paid') return c.redirect(`/?payment=${result === 'pending' ? 'pending' : 'failed'}`, 302)
+  const row = await c.env.DB.prepare('SELECT download_token FROM orders WHERE paypal_order_id = ?').bind(paypalOrderId).first<{ download_token: string }>()
+  return c.redirect(`/?paid=${encodeURIComponent(row!.download_token)}`, 302)
+})
+publicFiles.get('/paypal/cancel', (c) => c.redirect('/?payment=cancelled', 302))
 
 /** Public images uploaded from the back office. Ids are random, so responses can be cached forever. */
 publicFiles.get('/media/:id', async (c) => {

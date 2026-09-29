@@ -250,7 +250,7 @@ async function openOrder(id) {
     : ''
   const el = modal(`<h3>הזמנה #${o.id} ${pill(o.status)}</h3>
     <dl class="kv"><dt>לקוח</dt><dd>${esc(o.customer_name)}</dd><dt>אימייל</dt><dd><a href="mailto:${esc(o.customer_email)}">${esc(o.customer_email)}</a></dd>
-    <dt>טלפון</dt><dd>${esc(o.customer_phone || '—')}</dd><dt>נוצרה</dt><dd>${fmtDate(o.created_at)}</dd><dt>שולמה</dt><dd>${fmtDate(o.paid_at)}</dd></dl>
+    <dt>טלפון</dt><dd>${esc(o.customer_phone || '—')}</dd><dt>נוצרה</dt><dd>${fmtDate(o.created_at)}</dd><dt>שולמה</dt><dd>${fmtDate(o.paid_at)}</dd><dt>PayPal</dt><dd>${o.paypal_capture_id ? 'אושר אוטומטית · ' + esc(o.paypal_capture_id) : o.paypal_order_id ? 'ממתין לאישור לקוח' : 'ידני'}</dd></dl>
     <div class="tbl-wrap" style="margin-bottom:14px"><table><tbody>${o.items.map((i) => `<tr><td>${esc(i.product_name)}</td><td>× ${i.quantity}</td><td>${money(i.price * i.quantity)}</td></tr>`).join('')}
       <tr><td colspan="2"><b>סה"כ</b></td><td><b>${money(o.total_amount)}</b></td></tr></tbody></table></div>
     <div class="row"><div class="field"><label>סטטוס</label><select id="ordStatus">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${o.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
