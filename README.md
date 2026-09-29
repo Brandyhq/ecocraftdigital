@@ -1,6 +1,6 @@
 # EcoCraft Digital
 
-חנות מוצרים דיגיטליים בעברית (RTL) + בק אופיס מאובטח. Cloudflare Pages + Hono + D1.
+חנות מוצרים דיגיטליים בעברית (RTL) + בק אופיס מאובטח. Cloudflare Workers (Static Assets) + Hono + D1.
 
 ## מבנה
 | נתיב | תפקיד |
@@ -17,13 +17,14 @@
 npm ci
 cp .dev.vars.example .dev.vars      # ערכי SESSION_SECRET ו-SETUP_TOKEN
 npm run db:migrate:local && npm run db:seed
-npm run build && npm run dev:sandbox   # http://localhost:3000  ,  /admin
+npm run build && npm run dev:sandbox   # wrangler dev   # http://localhost:3000  ,  /admin
 ```
 
 ## פריסה
-1. `wrangler pages secret put SESSION_SECRET` (מחרוזת אקראית ארוכה) ו-`wrangler pages secret put SETUP_TOKEN`.
-2. `npm run db:migrate:prod` ואז (פעם אחת) `npm run db:seed:prod`.
-3. `npm run deploy`, ואז כנסי ל-`/admin` וצרי את חשבון המנהלת הראשון עם קוד ההתקנה. אחרי היצירה אפשר להסיר את `SETUP_TOKEN`.
+1. ב-Cloudflare: Workers & Pages ← Create ← Import a repository ← `Brandyhq/ecocraftdigital`, ענף `main`. Build command: `npm run build`, Deploy command: `npx wrangler deploy`. שם הפרויקט חייב להיות `ecocraftdigital` (כמו ב-`wrangler.jsonc`).
+2. ב-Settings ← Variables and Secrets הוסיפי כ-Secret: `SESSION_SECRET` (מחרוזת אקראית ארוכה) ו-`SETUP_TOKEN`. ה-D1 (`DB`) מוגדר כבר ב-`wrangler.jsonc`.
+3. מיגרציות: `npm run db:migrate:prod` ואז (פעם אחת) `npm run db:seed:prod`.
+4. כנסי ל-`/admin` וצרי את חשבון המנהלת הראשון עם קוד ההתקנה. אחרי היצירה אפשר למחוק את `SETUP_TOKEN`.
 
 ## אבטחה
 - סיסמאות: PBKDF2-SHA256; סשן: עוגיית HttpOnly + SameSite=Strict חתום ב-HMAC, בטל אוטומטית בהחלפת סיסמה; הגבלת ניסיונות התחברות; כותרת `X-Requested-With` חובה בבקשות משנות.
