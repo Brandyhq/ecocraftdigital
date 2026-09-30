@@ -157,7 +157,18 @@ export function parseDesign(body: unknown): Parsed<Design> {
         .map((f) => ({ icon: ICONS.includes(f.icon as string) ? f.icon : 'star', title: text(f.title, 80), body: text(f.body, 300) })),
       aboutTitle: text(body.aboutTitle, 200),
       aboutText: text(body.aboutText, 3000),
-      footerTagline: text(body.footerTagline, 300)
+      footerTagline: text(body.footerTagline, 300),
+      contactEmail: isEmail(text(body.contactEmail, 200)) ? text(body.contactEmail, 200) : '',
+      contactPhone: /^[0-9+\-\s]{7,20}$/.test(text(body.contactPhone, 20)) ? text(body.contactPhone, 20) : '',
+      whatsappUrl: httpsUrl(body.whatsappUrl) || '',
+      instagramUrl: httpsUrl(body.instagramUrl) || '',
+      businessName: text(body.businessName, 120),
+      businessId: text(body.businessId, 60),
+      aboutSections: (Array.isArray(body.aboutSections) ? body.aboutSections : [])
+        .filter(isObject)
+        .slice(0, 8)
+        .map((x) => ({ title: text(x.title, 120), body: text(x.body, 3000) }))
+        .filter((x) => x.title || x.body)
     }
   }
 }

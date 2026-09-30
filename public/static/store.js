@@ -350,17 +350,28 @@ function aboutPage(){
     <div><h2>${esc(d.aboutTitle)}</h2>${aboutParas(d.aboutText)}
       <div style="margin-top:22px"><button class="btn btn-primary" data-nav="shop">למוצרים שלנו</button></div></div>
   </div></div></section>
+  ${(d.aboutSections||[]).length?`<section class="block" style="padding-top:8px"><div class="wrap prose">${d.aboutSections.map(x=>`${x.title?`<h2>${esc(x.title)}</h2>`:''}${aboutParas(x.body)}`).join('')}</div></section>`:''}
   <section class="block band"><div class="wrap"><div class="feat-grid">${(d.features||[]).map(f=>feat(f.icon,f.title,f.body)).join('')}</div></div></section></main>`;
 }
 
 /* ---------- footer ---------- */
+const SYSTEM_PAGES=['faq','terms','privacy','refunds'];
+function pageHref(slug){return SYSTEM_PAGES.includes(slug)?'/'+slug:'/page/'+encodeURIComponent(slug);}
+function waLink(phone){const g=String(phone).replace(/\D/g,'');return 'https://wa.me/'+(g.startsWith('972')?g:g.replace(/^0/,'972'));}
+function contactLinks(d){
+  return [d.contactPhone?`<a href="${esc(waLink(d.contactPhone))}" target="_blank" rel="noopener">וואטסאפ ${esc(d.contactPhone)}</a>`:'',
+    d.whatsappUrl?`<a href="${esc(d.whatsappUrl)}" target="_blank" rel="noopener">ערוץ וואטסאפ</a>`:'',
+    d.instagramUrl?`<a href="${esc(d.instagramUrl)}" target="_blank" rel="noopener">אינסטגרם</a>`:'',
+    d.contactEmail?`<a href="mailto:${esc(d.contactEmail)}">${esc(d.contactEmail)}</a>`:''].join('');
+}
 function footer(){
   const d=DATA.design;
   return `<footer><div class="wrap"><div class="foot-grid">
     <div><div class="logo" data-nav="home" style="margin-bottom:14px"><div class="mark">${esc(d.logoText||'ED')}</div><div class="name">${esc(d.brandName)}<small>${esc(d.brandSub||'')}</small></div></div>
       <p>${esc(d.footerTagline||'')}</p></div>
     <div><h5>חנות</h5>${DATA.categories.map(c=>`<a data-cat="${c.id}">${esc(c.name)}</a>`).join('')}<a data-nav="shop">כל המוצרים</a></div>
-    <div><h5>מידע</h5><a data-nav="about">עלינו</a><a data-nav="shop">איך זה עובד</a><a data-nav="home">שאלות נפוצות</a><a data-nav="home">צור קשר</a></div>
+    <div><h5>מידע</h5><a href="/about" data-nav="about">עלינו</a>${(DATA.pages||[]).map(p=>`<a href="${pageHref(p.slug)}">${esc(p.title)}</a>`).join('')}<a href="/contact">צור קשר</a></div>
+    ${contactLinks(d)?`<div><h5>יצירת קשר</h5>${contactLinks(d)}</div>`:''}
     <div><h5>הישארי מעודכנת</h5><p>קבלי טיפים ומבצעים ישירות למייל.</p><div class="newsletter"><input type="email" placeholder="האימייל שלך"><button class="btn btn-primary" id="subBtn">הרשמה</button></div></div>
   </div><div class="foot-bottom"><span>© 2026 ${esc(d.brandName)} · כל הזכויות שמורות</span>
     <div class="fb-links"><span id="themeToggle">🌙 מצב כהה / בהיר</span></div>
@@ -433,5 +444,25 @@ if(q.get('paid')){
 }
 if(!q.get('paid'))route=routeFromPath();
 if(q.get('paid')||q.get('payment')){try{history.replaceState(null,'',location.pathname);}catch(e){}}
-render();
-if(bootToast)toast(bootToast[0],bootToast[1]);
+if(document.body.dataset.static){
+  /* content pages (FAQ, legal, contact) are rendered by the server; only wire up the chrome */
+  const bg=document.getElementById('burger');if(bg)bg.onclick=()=>document.getElementById('navlinks').classList.toggle('open');
+  updateCartBadge();
+  const cf=document.getElementById('contactForm');
+  if(cf)cf.onsubmit=async e=>{
+    e.preventDefault();
+    const out=document.getElementById('ctMsgOut'),btn=document.getElementById('ctSend');
+    out.style.color='inherit';btn.disabled=true;
+    try{
+      const res=await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        name:document.getElementById('ctName').value,email:document.getElementById('ctEmail').value,orderRef:document.getElementById('ctRef').value,
+        message:document.getElementById('ctMsg').value,website:document.getElementById('ctWebsite').value})});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok||!data.success){out.textContent=data.error||'לא הצלחנו לשלוח, נסי שוב';out.style.color='var(--rose)';btn.disabled=false;return;}
+      cf.reset();out.textContent='תודה! ההודעה נשלחה ונחזור אלייך בהקדם 💚';
+    }catch(err){out.textContent='לא הצלחנו לשלוח, נסי שוב';out.style.color='var(--rose)';btn.disabled=false;}
+  };
+}else{
+  render();
+  if(bootToast)toast(bootToast[0],bootToast[1]);
+}

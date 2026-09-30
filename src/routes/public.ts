@@ -15,6 +15,23 @@ const blob = (data: ArrayBuffer | number[]) => (Array.isArray(data) ? new Uint8A
 
 publicApi.get('/site', async (c) => c.json({ success: true, ...(await getSiteData(c.env.DB)) }))
 
+/** Contact form. A hidden honeypot field silently swallows bots; per-address rate limit keeps the inbox usable. */
+publicApi.post('/contact', async (c) => {
+  const body = await c.req.json().catch(() => null)
+  if (!isObject(body)) return c.json({ success: false, error: 'בקשה לא תקינה' }, 400)
+  if (text(body.website, 100)) return c.json({ success: true }) // honeypot filled: pretend it worked
+  const name = text(body.name, 120)
+  const email = text(body.email, 200).toLowerCase()
+  const message = text(body.message, 3000)
+  if (!name) return c.json({ success: false, error: 'נא למלא שם' }, 400)
+  if (!isEmail(email)) return c.json({ success: false, error: 'כתובת אימייל לא תקינה' }, 400)
+  if (message.length < 5) return c.json({ success: false, error: 'נא לכתוב הודעה' }, 400)
+  const recent = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM contact_messages WHERE email = ? AND created_at > datetime('now','-1 hour')").bind(email).first<{ n: number }>()
+  if ((recent?.n ?? 0) >= 5) return c.json({ success: false, error: 'נשלחו הרבה הודעות ממך לאחרונה. נסי שוב מאוחר יותר.' }, 429)
+  await c.env.DB.prepare('INSERT INTO contact_messages (name, email, order_ref, message) VALUES (?, ?, ?, ?)').bind(name, email, text(body.orderRef, 60), message).run()
+  return c.json({ success: true })
+})
+
 /** PayPal server-to-server notifications. Handling is idempotent and re-checks state with PayPal itself. */
 publicApi.post('/paypal/webhook', async (c) => {
   if (!paypalEnabled(c.env)) return c.json({ success: false }, 404)

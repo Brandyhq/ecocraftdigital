@@ -57,6 +57,8 @@ const NAV = [
   ['products', 'מוצרים', '🛍️'],
   ['categories', 'קטגוריות', '🗂️'],
   ['customers', 'לקוחות', '👥'],
+  ['pages', 'עמודים', '📄'],
+  ['messages', 'פניות', '📨'],
   ['content', 'תוכן האתר', '🎨'],
   ['settings', 'הגדרות', '⚙️']
 ]
@@ -175,6 +177,25 @@ const views = {
         views.customers()
       }
     }
+  }),
+
+  pages: guard(async function () {
+    const { pages } = await api('GET', '/pages')
+    state.cache.pages = pages
+    const SYS = ['faq', 'terms', 'privacy', 'refunds']
+    const href = (p) => (SYS.includes(p.slug) ? '/' + p.slug : '/page/' + p.slug)
+    main().innerHTML = `<div class="head"><h1>עמודים</h1><span class="grow"></span><button class="btn primary" data-act="pageNew">+ עמוד חדש</button></div>
+      <p class="muted">שאלות נפוצות, תקנון, פרטיות והחזרים. עמוד שמסומן "טיוטה" לא מוצג באתר ולא מקושר מהפוטר. עמודי התקנון הם נוסח פתיחה בלבד — יש להשלים את הסעיפים שמסומנים [להשלים] ולהעביר לבדיקה משפטית לפני פרסום.</p>
+      <div class="tbl-wrap"><table><thead><tr><th>עמוד</th><th>כתובת</th><th>סטטוס</th><th></th></tr></thead><tbody>${pages.map((p) => `<tr><td><b>${esc(p.title)}</b>${/\[להשלים|\{\{\w+\}\}/.test(p.body) ? '<div class="small" style="color:var(--warn)">יש סעיפים להשלמה</div>' : ''}</td><td dir="ltr" class="small">${esc(href(p))}</td>
+        <td>${p.published ? '<span class="pill paid">מפורסם</span>' : '<span class="pill pending">טיוטה</span>'}</td>
+        <td><div class="actions">${p.published ? `<a class="btn ghost sm" href="${esc(href(p))}" target="_blank" rel="noopener">צפייה</a>` : ''}<button class="btn ghost sm" data-act="pageEdit" data-slug="${esc(p.slug)}">עריכה</button>${SYS.includes(p.slug) ? '' : `<button class="btn danger sm" data-act="pageDelete" data-slug="${esc(p.slug)}">מחיקה</button>`}</div></td></tr>`).join('')}</tbody></table></div>`
+  }),
+
+  messages: guard(async function () {
+    const { messages } = await api('GET', '/messages')
+    main().innerHTML = `<div class="head"><h1>פניות מהאתר</h1></div>
+      ${messages.length ? messages.map((m) => `<div class="card" style="${m.handled ? 'opacity:.6' : ''}"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><b>${esc(m.name)}</b> <a href="mailto:${esc(m.email)}" dir="ltr">${esc(m.email)}</a>${m.order_ref ? `<span class="pill">הזמנה: ${esc(m.order_ref)}</span>` : ''}<span class="muted small">${fmtDate(m.created_at)}</span><span class="grow" style="flex:1"></span>
+        <button class="btn ghost sm" data-act="messageDone" data-id="${m.id}" data-handled="${m.handled ? 0 : 1}">${m.handled ? 'סימון כלא טופלה' : 'סימון כטופלה'}</button></div><p style="white-space:pre-wrap;margin:0">${esc(m.message)}</p></div>`).join('') : '<div class="card empty">אין פניות.</div>'}`
   }),
 
   content: guard(async function () {
@@ -364,6 +385,14 @@ function renderDesign() {
     <div class="card"><h3>אודות ופוטר</h3><div class="row">${t('כותרת', 'aboutTitle', d.aboutTitle)}${t('משפט בפוטר', 'footerTagline', d.footerTagline)}</div>
       <div class="field"><label>טקסט (פסקה חדשה = שורה חדשה)</label><textarea name="aboutText" style="min-height:130px">${esc(d.aboutText)}</textarea></div>
       <div class="field"><label>תמונה</label>${imagePicker('aboutImg', d.aboutImg)}</div></div>
+    <div class="card"><h3>עמוד "עלינו" — פרקים נוספים</h3><p class="hint" style="margin-top:-8px">כל פרק מופיע בעמוד "עלינו" (למשל: הסיפור שלנו, מה חשוב לנו, איך נוצר מוצר). כתבי רק דברים אמיתיים.</p>
+      ${(d.aboutSections || []).map((x, i) => `<div class="feat-edit"><div class="field"><label>כותרת הפרק</label><input type="text" data-as="title" data-i="${i}" value="${esc(x.title)}" maxlength="120"></div>
+        <div class="field"><label>טקסט</label><textarea data-as="body" data-i="${i}" maxlength="3000">${esc(x.body)}</textarea></div>
+        <button type="button" class="btn danger sm" data-act="aboutDelete" data-i="${i}">הסרה</button></div>`).join('')}
+      ${(d.aboutSections || []).length < 8 ? '<button type="button" class="btn ghost" data-act="aboutAdd">+ פרק</button>' : ''}</div>
+    <div class="card"><h3>פרטי קשר ועסק</h3><p class="hint" style="margin-top:-8px">מופיעים בעמוד "צור קשר", בפוטר ובעמודים המשפטיים. שדה ריק לא יוצג.</p>
+      <div class="row">${t('אימייל', 'contactEmail', d.contactEmail, 'type="email" dir="ltr"')}${t('טלפון / וואטסאפ', 'contactPhone', d.contactPhone, 'dir="ltr"')}${t('קישור לערוץ וואטסאפ', 'whatsappUrl', d.whatsappUrl, 'dir="ltr" placeholder="https://whatsapp.com/channel/…"')}${t('קישור לאינסטגרם', 'instagramUrl', d.instagramUrl, 'dir="ltr" placeholder="https://instagram.com/…"')}
+      ${t('שם העסק (לתקנון)', 'businessName', d.businessName)}${t('עוסק מורשה / פטור (מספר)', 'businessId', d.businessId)}</div></div>
     <div class="sticky-save"><button class="btn primary" type="submit">שמירה ופרסום</button></div></form>`
   $('#designForm').onsubmit = guard(async (e) => {
     e.preventDefault()
@@ -378,17 +407,40 @@ function readDesign() {
   const form = $('#designForm')
   const fd = new FormData(form)
   const d = { ...state.cache.design }
-  for (const k of ['brandName', 'brandSub', 'logoText', 'currency', 'headingFont', 'heroStyle', 'heroEyebrow', 'heroTitle', 'heroSubtitle', 'heroBadge', 'heroBadgeSub', 'heroLead', 'heroImg', 'featuredTitle', 'featuredSub', 'aboutTitle', 'aboutText', 'aboutImg', 'footerTagline']) d[k] = fd.get(k) ?? ''
+  for (const k of ['brandName', 'brandSub', 'logoText', 'currency', 'headingFont', 'heroStyle', 'heroEyebrow', 'heroTitle', 'heroSubtitle', 'heroBadge', 'heroBadgeSub', 'heroLead', 'heroImg', 'featuredTitle', 'featuredSub', 'aboutTitle', 'aboutText', 'aboutImg', 'footerTagline', 'contactEmail', 'contactPhone', 'whatsappUrl', 'instagramUrl', 'businessName', 'businessId']) d[k] = fd.get(k) ?? ''
   d.colors = Object.fromEntries(['sage', 'sageDeep', 'rose', 'cream', 'ink'].map((k) => [k, fd.get('color_' + k)]))
   d.trust = String(fd.get('trust') || '').split('\n').map((x) => x.trim()).filter(Boolean)
   d.featuredIds = fd.getAll('featured')
   d.homeSections = (d.homeSections || []).map((s) => ({ id: s.id, on: !!form.querySelector(`[data-section="${s.id}"]`)?.checked }))
+  d.aboutSections = (d.aboutSections || []).map((x, i) => ({
+    title: form.querySelector(`[data-as="title"][data-i="${i}"]`).value,
+    body: form.querySelector(`[data-as="body"][data-i="${i}"]`).value
+  }))
   d.features = (d.features || []).map((f, i) => ({
     icon: form.querySelector(`[data-f="icon"][data-i="${i}"]`).value,
     title: form.querySelector(`[data-f="title"][data-i="${i}"]`).value,
     body: form.querySelector(`[data-f="body"][data-i="${i}"]`).value
   }))
   return d
+}
+
+/* ---------------------------------------------------------------- pages */
+function pageForm(p) {
+  main().innerHTML = `<div class="head"><h1>${p.isNew ? 'עמוד חדש' : 'עריכת עמוד'}</h1></div><form id="pageForm" data-slug="${esc(p.slug)}" data-new="${p.isNew ? 1 : ''}">
+    <div class="card"><div class="row">${p.isNew ? '<div class="field"><label>מזהה (כתובת: /page/…)</label><input type="text" name="slug" dir="ltr" placeholder="my-page" required></div>' : ''}
+      <div class="field"><label>כותרת</label><input type="text" name="title" value="${esc(p.title)}" maxlength="150" required></div></div>
+      <div class="field"><label>תוכן</label><textarea name="body" style="min-height:360px" dir="rtl">${esc(p.body)}</textarea>
+        <p class="hint">כותרת משנה: <code>## כותרת</code> · רשימה: <code>- פריט</code> · תיבה מודגשת: <code>&gt; טקסט</code> · שורה ריקה = פסקה חדשה. אפשר להשתמש ב-<code>{{businessName}}</code>, <code>{{businessId}}</code>, <code>{{contactEmail}}</code>, <code>{{siteUrl}}</code> — הם יתמלאו מ"פרטי קשר ועסק" בעריכת תוכן האתר.</p></div>
+      <label class="check"><input type="checkbox" name="published" ${p.published ? 'checked' : ''}> מפורסם באתר</label></div>
+    <div class="sticky-save"><button class="btn primary" type="submit">שמירה</button><button class="btn ghost" type="button" data-act="nav" data-view="pages">ביטול</button></div></form>`
+  $('#pageForm').onsubmit = guard(async (e) => {
+    e.preventDefault()
+    const fd = new FormData(e.target)
+    const slug = e.target.dataset.new ? String(fd.get('slug') || '').trim().toLowerCase() : e.target.dataset.slug
+    await api('PUT', `/pages/${encodeURIComponent(slug)}`, { title: fd.get('title'), body: fd.get('body'), published: fd.has('published') })
+    toast('נשמר ✓')
+    views.pages()
+  })
 }
 
 /* -------------------------------------------------------------- actions */
@@ -465,6 +517,28 @@ const actions = {
     state.cache.design.features.push({ icon: 'star', title: '', body: '' })
     renderDesign()
   },
+  aboutAdd: () => {
+    state.cache.design = readDesign()
+    ;(state.cache.design.aboutSections ||= []).push({ title: '', body: '' })
+    renderDesign()
+  },
+  aboutDelete: (el) => {
+    state.cache.design = readDesign()
+    state.cache.design.aboutSections.splice(+el.dataset.i, 1)
+    renderDesign()
+  },
+  pageEdit: (el) => pageForm(state.cache.pages.find((p) => p.slug === el.dataset.slug)),
+  pageNew: () => pageForm({ slug: '', title: '', body: '', published: 0, isNew: true }),
+  pageDelete: guard(async (el) => {
+    if (!confirm('למחוק את העמוד?')) return
+    await api('DELETE', `/pages/${encodeURIComponent(el.dataset.slug)}`)
+    toast('העמוד נמחק')
+    views.pages()
+  }),
+  messageDone: guard(async (el) => {
+    await api('PATCH', `/messages/${el.dataset.id}`, { handled: el.dataset.handled === '1' })
+    views.messages()
+  }),
   featDelete: (el) => {
     state.cache.design = readDesign()
     state.cache.design.features.splice(+el.dataset.i, 1)

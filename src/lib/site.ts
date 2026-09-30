@@ -30,14 +30,15 @@ const DEFAULT_SECTIONS = [
 
 /** Shape consumed by public/static/store.js. Never includes private file links. */
 export async function getSiteData(db: D1Database) {
-  const [settings, categories, products] = await db.batch([
+  const [settings, categories, products, pages] = await db.batch([
     db.prepare("SELECT value FROM site_settings WHERE key = 'design'"),
     db.prepare('SELECT id, name FROM categories ORDER BY sort_order, name'),
     db.prepare(
       `SELECT p.*, c.name AS category_name FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
        WHERE p.active = 1 ORDER BY p.sort_order, p.id`
-    )
+    ),
+    db.prepare('SELECT slug, title FROM pages WHERE published = 1 ORDER BY CASE slug WHEN \'faq\' THEN 0 WHEN \'terms\' THEN 1 WHEN \'privacy\' THEN 2 WHEN \'refunds\' THEN 3 ELSE 4 END, title')
   ])
 
   let design: Design = {}
@@ -55,6 +56,7 @@ export async function getSiteData(db: D1Database) {
   return {
     design,
     categories: categories.results,
+    pages: pages.results as { slug: string; title: string }[],
     products: (products.results as ProductRow[]).map((p) => ({
       id: p.slug,
       cat: p.category_id ?? '',
