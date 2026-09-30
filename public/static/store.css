@@ -264,3 +264,6 @@ footer{background:var(--cream-2);border-top:1px solid var(--line);padding:52px 0
 .prose .note-box{margin:0 0 18px}
 .contact-form{margin-top:26px;max-width:560px;position:relative}
 .hp{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);opacity:0;pointer-events:none}
+.foot-grid.five{grid-template-columns:1.4fr 1fr 1fr 1fr 1.3fr}
+@media (max-width:900px){.foot-grid.five{grid-template-columns:1fr 1fr;gap:26px}}
+@media (max-width:560px){.foot-grid.five{grid-template-columns:1fr}}

@@ -366,7 +366,7 @@ function contactLinks(d){
 }
 function footer(){
   const d=DATA.design;
-  return `<footer><div class="wrap"><div class="foot-grid">
+  return `<footer><div class="wrap"><div class="foot-grid${contactLinks(d)?' five':''}">
     <div><div class="logo" data-nav="home" style="margin-bottom:14px"><div class="mark">${esc(d.logoText||'ED')}</div><div class="name">${esc(d.brandName)}<small>${esc(d.brandSub||'')}</small></div></div>
       <p>${esc(d.footerTagline||'')}</p></div>
     <div><h5>חנות</h5>${DATA.categories.map(c=>`<a data-cat="${c.id}">${esc(c.name)}</a>`).join('')}<a data-nav="shop">כל המוצרים</a></div>
