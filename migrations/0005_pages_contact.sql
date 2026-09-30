@@ -99,4 +99,4 @@ INSERT INTO pages (slug, title, body, published) VALUES ('refunds', 'ביטול�
 דרך עמוד "צור קשר" או ב-{{contactEmail}}.', 0);
 
 -- Contact address for the storefront (editable later in the back office).
-UPDATE site_settings SET value = json_set(value, '$.contactEmail', 'ecocraftdigital@gmail.com', '$.contactPhone', '0507148144') WHERE key = 'design';
+UPDATE site_settings SET value = json_set(value, '$.contactEmail', 'ecocraftdigital@gmail.com', '$.contactPhone', '0507148144', '$.instagramUrl', 'https://www.instagram.com/michalecocraftdigital/') WHERE key = 'design';
