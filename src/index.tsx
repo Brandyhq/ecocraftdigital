@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
-import type { AppEnv } from './env'
+import type { AppEnv, Bindings } from './env'
 import { escapeHtml } from './lib/html'
-import { getSiteData, safeJson } from './lib/site'
+import { getSiteData } from './lib/site'
+import type { Site } from './lib/ssr'
+import { aboutBody, breadcrumbLd, homeBody, organizationLd, page, productBody, productLd, shopBody } from './lib/ssr'
 import admin from './routes/admin'
 import { publicApi, publicFiles } from './routes/public'
 
@@ -25,20 +27,119 @@ app.use('/api/*', async (c, next) => {
 const FONTS =
   'https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Assistant:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Heebo:wght@400;500;700;900&display=swap'
 
+/** Canonical origin: SITE_URL when set (custom domain), otherwise the host the request came in on. */
+const originOf = (c: { env: Bindings; req: { url: string } }) => (c.env.SITE_URL || new URL(c.req.url).origin).replace(/\/+$/, '')
+const clip = (s: string, n = 155) => (s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s)
+const design = (site: Site) => site.design as { brandName?: string; heroTitle?: string; heroLead?: string; heroImg?: string; aboutText?: string }
+
 app.get('/', async (c) => {
   const site = await getSiteData(c.env.DB)
-  const d = site.design as { brandName?: string; heroLead?: string }
-  return c.html(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(d.brandName || 'EcoCraft Digital')}</title>
-<meta name="description" content="${escapeHtml(d.heroLead || '')}">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="${FONTS}">
-<link rel="stylesheet" href="/static/store.css">
-</head><body><div id="app"></div><div class="toast" id="toast"></div>
-<script id="appdata" type="application/json">${safeJson(site)}</script>
-<script src="/static/store.js"></script>
-</body></html>`)
+  const d = design(site)
+  const origin = originOf(c)
+  return c.html(
+    page({
+      origin, path: '/', site,
+      title: `${d.brandName} — ${d.heroTitle}`,
+      description: clip(d.heroLead || ''),
+      image: d.heroImg,
+      jsonld: [organizationLd(site, origin)],
+      body: homeBody(site)
+    })
+  )
+})
+
+app.get('/shop', async (c) => {
+  const site = await getSiteData(c.env.DB)
+  const d = design(site)
+  return c.html(
+    page({
+      origin: originOf(c), path: '/shop', site,
+      title: `כל המוצרים הדיגיטליים | ${d.brandName}`,
+      description: clip(`מתכננים דיגיטליים, משחקי למידה וקורסים בעברית — ${site.products.map((p) => p.name).join(', ')}.`),
+      image: d.heroImg,
+      body: shopBody(site)
+    })
+  )
+})
+
+app.get('/about', async (c) => {
+  const site = await getSiteData(c.env.DB)
+  const d = design(site)
+  return c.html(
+    page({
+      origin: originOf(c), path: '/about', site,
+      title: `עלינו | ${d.brandName}`,
+      description: clip((d.aboutText || '').split('\n')[0]),
+      image: d.heroImg,
+      body: aboutBody(site)
+    })
+  )
+})
+
+app.get('/product/:slug', async (c) => {
+  const site = await getSiteData(c.env.DB)
+  const p = site.products.find((x) => x.id === c.req.param('slug'))
+  if (!p) return c.html('<!doctype html><html lang="he" dir="rtl"><meta name="robots" content="noindex"><title>המוצר לא נמצא</title><body><p>המוצר לא נמצא. <a href="/shop">לכל המוצרים</a></p></body></html>', 404)
+  const d = design(site)
+  const origin = originOf(c)
+  return c.html(
+    page({
+      origin, path: `/product/${encodeURIComponent(p.id)}`, site, ogType: 'product',
+      title: `${p.name} | ${d.brandName}`,
+      description: clip(p.short || p.desc),
+      image: p.img || d.heroImg,
+      jsonld: [productLd(site, p, origin), breadcrumbLd(origin, p)],
+      body: productBody(site, p)
+    })
+  )
+})
+
+// Cart and checkout are the same SPA but must stay out of search results.
+for (const path of ['/cart', '/checkout']) {
+  app.get(path, async (c) => {
+    const site = await getSiteData(c.env.DB)
+    const d = design(site)
+    c.header('X-Robots-Tag', 'noindex')
+    return c.html(page({ origin: originOf(c), path, site, noindex: true, title: `${path === '/cart' ? 'עגלת קניות' : 'סיום הזמנה'} | ${d.brandName}`, description: '', body: '' }))
+  })
+}
+
+app.get('/robots.txt', (c) =>
+  c.text(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nDisallow: /download/\nDisallow: /paypal/\nDisallow: /cart\nDisallow: /checkout\n\nSitemap: ${originOf(c)}/sitemap.xml\n`)
+)
+
+app.get('/sitemap.xml', async (c) => {
+  const origin = originOf(c)
+  const { results } = await c.env.DB.prepare('SELECT slug, updated_at FROM products WHERE active = 1 ORDER BY sort_order, id').all<{ slug: string; updated_at: string | null }>()
+  const urls = [
+    `<url><loc>${origin}/</loc></url>`,
+    `<url><loc>${origin}/shop</loc></url>`,
+    `<url><loc>${origin}/about</loc></url>`,
+    ...results.map((r) => `<url><loc>${escapeHtml(`${origin}/product/${encodeURIComponent(r.slug)}`)}</loc>${r.updated_at ? `<lastmod>${r.updated_at.slice(0, 10)}</lastmod>` : ''}</url>`)
+  ]
+  return c.body(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  ${urls.join('\n  ')}\n</urlset>\n`, 200, { 'Content-Type': 'application/xml; charset=utf-8' })
+})
+
+/** llms.txt is generated from the database so prices and products never go stale. */
+app.get('/llms.txt', async (c) => {
+  const site = await getSiteData(c.env.DB)
+  const d = design(site)
+  const origin = originOf(c)
+  const lines = [
+    `# ${d.brandName}`,
+    '',
+    `> ${d.heroLead || ''}`,
+    '',
+    '## מוצרים',
+    ...site.products.map((p) => `- [${p.name}](${origin}/product/${encodeURIComponent(p.id)}): ${p.short} ₪${p.price}.`),
+    '',
+    '## קישורים',
+    `- [דף הבית](${origin}/)`,
+    `- [כל המוצרים](${origin}/shop)`,
+    `- [עלינו](${origin}/about)`,
+    ''
+  ]
+  return c.body(lines.join('\n'), 200, { 'Content-Type': 'text/plain; charset=utf-8' })
 })
 
 // Back office shell. All data comes from the authenticated /api/admin routes.
