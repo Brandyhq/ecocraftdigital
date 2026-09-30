@@ -31,15 +31,40 @@ function header(d: Design, active: string) {
   return `<header><div class="wrap"><nav class="nav">
     <a class="logo" href="/" data-nav="home"><div class="mark">${e(d.logoText || 'ED')}</div><div class="name">${e(d.brandName)}<small>${e(d.brandSub || '')}</small></div></a>
     <div class="nav-links" id="navlinks">${links.map(([id, href, label]) => `<a href="${href}" data-nav="${id}" class="${active === id ? 'active' : ''}">${label}</a>`).join('')}</div>
-    <div class="nav-icons"><a class="icon-btn" href="/cart" data-nav="cart" aria-label="עגלה">${cartIcon}</a></div>
+    <div class="nav-icons"><button class="icon-btn hamburger" id="burger" aria-label="תפריט"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><a class="icon-btn" href="/cart" data-nav="cart" aria-label="עגלה">${cartIcon}</a></div>
   </nav></div></header>`
 }
 
-function footer(d: Design, cats: Site['categories']) {
+/** Click-to-chat link for an Israeli mobile number (050-123-4567 -> https://wa.me/972501234567). */
+export const waLink = (phone: string) => {
+  const digits = phone.replace(/\D/g, '')
+  const intl = digits.startsWith('972') ? digits : digits.replace(/^0/, '972')
+  return `https://wa.me/${intl}`
+}
+
+export const SYSTEM_PAGES = ['faq', 'terms', 'privacy', 'refunds']
+/** System pages live at the root (/faq); custom pages under /page/. */
+export const pageHref = (slug: string) => (SYSTEM_PAGES.includes(slug) ? `/${slug}` : `/page/${encodeURIComponent(slug)}`)
+
+function footer(site: Site) {
+  const d = site.design as Design
+  const cats = site.categories as { id: string; name: string }[]
+  const info = [
+    `<a href="/about" data-nav="about">עלינו</a>`,
+    ...site.pages.map((p) => `<a href="${pageHref(p.slug)}">${e(p.title)}</a>`),
+    `<a href="/contact">צור קשר</a>`
+  ]
+  const social = [
+    d.contactPhone ? `<a href="${e(waLink(d.contactPhone))}" target="_blank" rel="noopener">וואטסאפ ${e(d.contactPhone)}</a>` : '',
+    d.whatsappUrl ? `<a href="${e(d.whatsappUrl)}" target="_blank" rel="noopener">ערוץ וואטסאפ</a>` : '',
+    d.instagramUrl ? `<a href="${e(d.instagramUrl)}" target="_blank" rel="noopener">אינסטגרם</a>` : '',
+    d.contactEmail ? `<a href="mailto:${e(d.contactEmail)}">${e(d.contactEmail)}</a>` : ''
+  ].filter(Boolean)
   return `<footer><div class="wrap"><div class="foot-grid">
     <div><a class="logo" href="/" data-nav="home" style="margin-bottom:14px"><div class="mark">${e(d.logoText || 'ED')}</div><div class="name">${e(d.brandName)}<small>${e(d.brandSub || '')}</small></div></a><p>${e(d.footerTagline || '')}</p></div>
-    <div><h5>חנות</h5>${(cats as { id: string; name: string }[]).map((c) => `<a href="/shop" data-cat="${e(c.id)}">${e(c.name)}</a>`).join('')}<a href="/shop" data-nav="shop">כל המוצרים</a></div>
-    <div><h5>מידע</h5><a href="/about" data-nav="about">עלינו</a></div>
+    <div><h5>חנות</h5>${cats.map((c) => `<a href="/shop" data-cat="${e(c.id)}">${e(c.name)}</a>`).join('')}<a href="/shop" data-nav="shop">כל המוצרים</a></div>
+    <div><h5>מידע</h5>${info.join('')}</div>
+    ${social.length ? `<div><h5>יצירת קשר</h5>${social.join('')}</div>` : ''}
   </div><div class="foot-bottom"><span>© 2026 ${e(d.brandName)} · כל הזכויות שמורות</span></div></div></footer>`
 }
 
@@ -71,7 +96,7 @@ export function homeBody(site: Site) {
     <div class="hero-cta"><a class="btn btn-primary" href="/shop" data-nav="shop">לחנות המלאה</a>${first ? `<a class="btn btn-ghost" href="/product/${encodeURIComponent(first.id)}" data-plink>${e(first.name)} ›</a>` : ''}</div></div>
     <div class="hero-media"><img src="${e(d.heroImg)}" alt="${e(d.brandName)}"></div></div>
     <div class="trust">${(d.trust || []).map((t: string) => `<div class="chip">${check}${e(t)}</div>`).join('')}</div></div></section>`
-  return header(d, 'home') + `<main>${hero}${(d.homeSections || []).filter((s: Design) => s.on).map((s: Design) => sec(s.id)).join('')}</main>` + footer(d, site.categories)
+  return header(d, 'home') + `<main>${hero}${(d.homeSections || []).filter((s: Design) => s.on).map((s: Design) => sec(s.id)).join('')}</main>` + footer(site)
 }
 
 export function shopBody(site: Site) {
@@ -80,7 +105,7 @@ export function shopBody(site: Site) {
     header(d, 'shop') +
     `<main><div class="page-head"><div class="wrap"><span class="eyebrow">החנות</span><h1>כל המוצרים הדיגיטליים</h1></div></div>
     <section class="block" style="padding-top:26px"><div class="wrap"><div class="grid">${site.products.map((p) => card(d, p)).join('')}</div></div></section></main>` +
-    footer(d, site.categories)
+    footer(site)
   )
 }
 
@@ -91,9 +116,42 @@ export function aboutBody(site: Site) {
     `<main><div class="page-head"><div class="wrap"><span class="eyebrow">${e(d.brandName)}</span><h1>נעים להכיר</h1></div></div>
     <section class="block" style="padding-top:24px"><div class="wrap"><div class="about-grid"><div class="about-media"><img src="${e(d.aboutImg || d.heroImg)}" alt="${e(d.brandName)}"></div>
     <div><h2>${e(d.aboutTitle)}</h2>${paras(d.aboutText)}<div style="margin-top:22px"><a class="btn btn-primary" href="/shop" data-nav="shop">למוצרים שלנו</a></div></div></div></div></section>
+    ${aboutSections(d)}
     <section class="block band"><div class="wrap"><div class="feat-grid">${(d.features || []).map(feat).join('')}</div></div></section></main>` +
-    footer(d, site.categories)
+    footer(site)
   )
+}
+
+export const aboutSections = (d: Design) =>
+  (d.aboutSections || []).length
+    ? `<section class="block" style="padding-top:8px"><div class="wrap prose">${(d.aboutSections as { title: string; body: string }[]).map((x) => `${x.title ? `<h2>${e(x.title)}</h2>` : ''}${paras(x.body)}`).join('')}</div></section>`
+    : ''
+
+export function staticBody(site: Site, title: string, html: string) {
+  const d = site.design as Design
+  return header(d, '') + `<main><div class="page-head"><div class="wrap"><h1>${e(title)}</h1></div></div><section class="block" style="padding-top:20px"><div class="wrap prose">${html}</div></section></main>` + footer(site)
+}
+
+export function contactBody(site: Site) {
+  const d = site.design as Design
+  const ch = [
+    d.contactEmail ? `<li><span>אימייל: <a href="mailto:${e(d.contactEmail)}">${e(d.contactEmail)}</a></span></li>` : '',
+    d.contactPhone ? `<li><span>וואטסאפ / טלפון: <a href="${e(waLink(d.contactPhone))}" target="_blank" rel="noopener">${e(d.contactPhone)}</a></span></li>` : '',
+    d.whatsappUrl ? `<li><span>ערוץ וואטסאפ: <a href="${e(d.whatsappUrl)}" target="_blank" rel="noopener">הצטרפות לערוץ</a></span></li>` : '',
+    d.instagramUrl ? `<li><span>אינסטגרם: <a href="${e(d.instagramUrl)}" target="_blank" rel="noopener">לפרופיל שלנו</a></span></li>` : ''
+  ].filter(Boolean)
+  const html = `<p>יש שאלה על מוצר, הזמנה או תקלה? כתבו לנו ונחזור אליכם.</p>
+    ${ch.length ? `<ul class="incl">${ch.join('')}</ul>` : ''}
+    <form id="contactForm" class="contact-form" novalidate>
+      <div class="field"><label for="ctName">שם</label><input type="text" id="ctName" maxlength="120" autocomplete="name" required></div>
+      <div class="field"><label for="ctEmail">אימייל</label><input type="email" id="ctEmail" maxlength="200" autocomplete="email" required></div>
+      <div class="field"><label for="ctRef">מספר הזמנה (אם יש)</label><input type="text" id="ctRef" maxlength="60"></div>
+      <div class="field"><label for="ctMsg">ההודעה</label><textarea id="ctMsg" maxlength="3000" required></textarea></div>
+      <div class="hp" aria-hidden="true"><input type="text" id="ctWebsite" tabindex="-1" autocomplete="off"></div>
+      <button class="btn btn-primary" type="submit" id="ctSend">שליחה</button>
+      <p id="ctMsgOut" style="margin-top:12px"></p>
+    </form>`
+  return staticBody(site, 'צור קשר', html)
 }
 
 export function productBody(site: Site, p: Product) {
@@ -105,7 +163,7 @@ export function productBody(site: Site, p: Product) {
     <div class="pd"><div class="pd-media">${media}</div><div><div style="color:var(--rose);font-weight:700;font-size:12.5px;margin-bottom:8px">${e(p.catName)}</div>
     <h1>${e(p.name)}</h1><div class="pd-price">${money(d, p.price)}${p.old ? `<span class="old">${money(d, p.old as number)}</span>` : ''}</div>
     <p class="pd-desc">${e(p.desc)}</p><ul class="incl">${p.incl.map((i) => `<li>${check}<span>${e(i)}</span></li>`).join('')}</ul></div></div></div></main>` +
-    footer(d, site.categories)
+    footer(site)
   )
 }
 
@@ -118,6 +176,8 @@ type Page = {
   ogType?: string
   jsonld?: object[]
   noindex?: boolean
+  /** Content pages: server-rendered only; store.js just wires up the header/footer instead of rendering the SPA. */
+  static?: boolean
   body: string
   site: Site
 }
@@ -140,7 +200,7 @@ ${image ? `<meta property="og:image" content="${e(image)}">` : ''}
 ${(o.jsonld || []).map((j) => `<script type="application/ld+json">${safeJson(j)}</script>`).join('\n')}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${FONTS}"><link rel="stylesheet" href="/static/store.css">
-</head><body><div id="app">${o.body}</div><div class="toast" id="toast"></div>
+</head><body${o.static ? ' data-static="1"' : ''}><div id="app">${o.body}</div><div class="toast" id="toast"></div>
 <script id="appdata" type="application/json">${safeJson(o.site)}</script>
 <script src="/static/store.js"></script>
 </body></html>`

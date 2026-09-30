@@ -255,3 +255,15 @@ footer{background:var(--cream-2);border-top:1px solid var(--line);padding:52px 0
   body{font-size:16px}.grid{grid-template-columns:1fr;gap:16px}.foot-grid{grid-template-columns:1fr}
   .logo .name{font-size:22px}section.block{padding:42px 0}.row2{grid-template-columns:1fr}
 }
+
+/* content pages */
+.prose{max-width:760px}
+.prose h2{font-size:26px;color:var(--sage-deep);margin:34px 0 10px}
+.prose p{margin:0 0 14px}
+.prose a{color:var(--sage-deep);text-decoration:underline}
+.prose .note-box{margin:0 0 18px}
+.contact-form{margin-top:26px;max-width:560px;position:relative}
+.hp{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);opacity:0;pointer-events:none}
+.foot-grid.five{grid-template-columns:1.4fr 1fr 1fr 1fr 1.3fr}
+@media (max-width:900px){.foot-grid.five{grid-template-columns:1fr 1fr;gap:26px}}
+@media (max-width:560px){.foot-grid.five{grid-template-columns:1fr}}

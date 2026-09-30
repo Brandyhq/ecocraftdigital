@@ -338,6 +338,47 @@ admin.get('/customers', async (c) => {
   return c.json({ success: true, customers: results })
 })
 
+/* ----------------------------------------------------- content pages & messages */
+
+admin.get('/pages', async (c) => {
+  const { results } = await c.env.DB.prepare('SELECT slug, title, body, published, updated_at FROM pages ORDER BY slug').all()
+  return c.json({ success: true, pages: results })
+})
+
+admin.put('/pages/:slug', async (c) => {
+  const body = await c.req.json().catch(() => null)
+  const slug = c.req.param('slug').toLowerCase()
+  if (!/^[a-z0-9][a-z0-9-]{0,59}$/.test(slug)) return c.json({ success: false, error: 'מזהה עמוד לא תקין (אותיות לועזיות קטנות, ספרות ומקפים)' }, 400)
+  if (!isObject(body)) return c.json({ success: false, error: 'בקשה לא תקינה' }, 400)
+  const title = text(body.title, 150)
+  if (!title) return c.json({ success: false, error: 'כותרת העמוד חובה' }, 400)
+  await c.env.DB.prepare(
+    `INSERT INTO pages (slug, title, body, published, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+     ON CONFLICT(slug) DO UPDATE SET title = excluded.title, body = excluded.body, published = excluded.published, updated_at = CURRENT_TIMESTAMP`
+  )
+    .bind(slug, title, typeof body.body === 'string' ? body.body.slice(0, 40000) : '', body.published === true ? 1 : 0)
+    .run()
+  return c.json({ success: true })
+})
+
+admin.delete('/pages/:slug', async (c) => {
+  if (['faq', 'terms', 'privacy', 'refunds'].includes(c.req.param('slug'))) return c.json({ success: false, error: 'אי אפשר למחוק עמוד מערכת. אפשר להסתיר אותו.' }, 400)
+  const res = await c.env.DB.prepare('DELETE FROM pages WHERE slug = ?').bind(c.req.param('slug')).run()
+  return res.meta.changes ? c.json({ success: true }) : c.json({ success: false, error: 'העמוד לא נמצא' }, 404)
+})
+
+admin.get('/messages', async (c) => {
+  const { results } = await c.env.DB.prepare('SELECT id, name, email, order_ref, message, handled, created_at FROM contact_messages ORDER BY handled, id DESC LIMIT 200').all()
+  return c.json({ success: true, messages: results })
+})
+
+admin.patch('/messages/:id', async (c) => {
+  const body = await c.req.json().catch(() => null)
+  if (!isObject(body) || typeof body.handled !== 'boolean') return c.json({ success: false, error: 'בקשה לא תקינה' }, 400)
+  await c.env.DB.prepare('UPDATE contact_messages SET handled = ? WHERE id = ?').bind(body.handled ? 1 : 0, c.req.param('id')).run()
+  return c.json({ success: true })
+})
+
 /* ---------------------------------------------------------- site content */
 
 admin.get('/design', async (c) => c.json({ success: true, design: (await getSiteData(c.env.DB)).design }))

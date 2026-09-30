@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import type { AppEnv, Bindings } from './env'
 import { escapeHtml } from './lib/html'
 import { getSiteData } from './lib/site'
 import type { Site } from './lib/ssr'
-import { aboutBody, breadcrumbLd, homeBody, organizationLd, page, productBody, productLd, shopBody } from './lib/ssr'
+import { faqLd, fillVars, firstText, hasPlaceholders, renderBody } from './lib/content'
+import { aboutBody, breadcrumbLd, contactBody, homeBody, organizationLd, page, pageHref, productBody, productLd, shopBody, staticBody, SYSTEM_PAGES } from './lib/ssr'
 import admin from './routes/admin'
 import { publicApi, publicFiles } from './routes/public'
 
@@ -94,6 +96,33 @@ app.get('/product/:slug', async (c) => {
   )
 })
 
+/** Editable content pages (FAQ, legal, custom). Unpublished pages are 404 for the public. */
+async function contentPage(c: Context<AppEnv>, slug: string) {
+  const row = await c.env.DB.prepare('SELECT slug, title, body FROM pages WHERE slug = ? AND published = 1').bind(slug).first<{ slug: string; title: string; body: string }>()
+  const site = await getSiteData(c.env.DB)
+  const d = site.design as Record<string, string>
+  if (!row) return c.html(page({ origin: originOf(c), path: '/', site, static: true, noindex: true, title: 'העמוד לא נמצא', description: '', body: staticBody(site, 'העמוד לא נמצא', '<p>העמוד שחיפשת לא קיים. <a href="/shop">לכל המוצרים</a></p>') }), 404)
+  const text = fillVars(row.body, { businessName: d.businessName, businessId: d.businessId, contactEmail: d.contactEmail, siteUrl: originOf(c) })
+  const origin = originOf(c)
+  return c.html(
+    page({
+      origin, path: pageHref(row.slug), site, static: true,
+      title: `${row.title} | ${d.brandName}`,
+      description: clip(firstText(text) || row.title),
+      jsonld: row.slug === 'faq' ? [faqLd(text)].filter(Boolean) as object[] : [],
+      body: staticBody(site, row.title, renderBody(text))
+    })
+  )
+}
+for (const slug of SYSTEM_PAGES) app.get(`/${slug}`, (c) => contentPage(c, slug))
+app.get('/page/:slug', (c) => contentPage(c, c.req.param('slug')))
+
+app.get('/contact', async (c) => {
+  const site = await getSiteData(c.env.DB)
+  const d = design(site)
+  return c.html(page({ origin: originOf(c), path: '/contact', site, static: true, title: `צור קשר | ${d.brandName}`, description: 'שאלה על מוצר, הזמנה או תקלה? כתבו לנו ונחזור אליכם.', body: contactBody(site) }))
+})
+
 // Cart and checkout are the same SPA but must stay out of search results.
 for (const path of ['/cart', '/checkout']) {
   app.get(path, async (c) => {
@@ -111,10 +140,13 @@ app.get('/robots.txt', (c) =>
 app.get('/sitemap.xml', async (c) => {
   const origin = originOf(c)
   const { results } = await c.env.DB.prepare('SELECT slug, updated_at FROM products WHERE active = 1 ORDER BY sort_order, id').all<{ slug: string; updated_at: string | null }>()
+  const { results: pageRows } = await c.env.DB.prepare('SELECT slug FROM pages WHERE published = 1').all<{ slug: string }>()
   const urls = [
     `<url><loc>${origin}/</loc></url>`,
     `<url><loc>${origin}/shop</loc></url>`,
     `<url><loc>${origin}/about</loc></url>`,
+    `<url><loc>${origin}/contact</loc></url>`,
+    ...pageRows.map((r) => `<url><loc>${escapeHtml(origin + pageHref(r.slug))}</loc></url>`),
     ...results.map((r) => `<url><loc>${escapeHtml(`${origin}/product/${encodeURIComponent(r.slug)}`)}</loc>${r.updated_at ? `<lastmod>${r.updated_at.slice(0, 10)}</lastmod>` : ''}</url>`)
   ]
   return c.body(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  ${urls.join('\n  ')}\n</urlset>\n`, 200, { 'Content-Type': 'application/xml; charset=utf-8' })
@@ -137,6 +169,8 @@ app.get('/llms.txt', async (c) => {
     `- [דף הבית](${origin}/)`,
     `- [כל המוצרים](${origin}/shop)`,
     `- [עלינו](${origin}/about)`,
+    `- [צור קשר](${origin}/contact)`,
+    ...site.pages.map((p) => `- [${p.title}](${origin}${pageHref(p.slug)})`),
     ''
   ]
   return c.body(lines.join('\n'), 200, { 'Content-Type': 'text/plain; charset=utf-8' })
