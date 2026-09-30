@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { AppEnv } from '../env'
 import { escapeHtml } from '../lib/html'
 import { applyCoupon } from '../lib/coupons'
+import { sendMail } from '../lib/mail'
 import { markOrderPaid } from '../lib/payments'
 import { createPaymentLink, extractCallback, payplusEnabled, verifyCallback } from '../lib/payplus'
 import { getSiteData } from '../lib/site'
@@ -17,6 +18,9 @@ const blob = (data: ArrayBuffer | number[]) => (Array.isArray(data) ? new Uint8A
 
 publicApi.get('/site', async (c) => c.json({ success: true, ...(await getSiteData(c.env.DB)) }))
 
+const WELCOME_PERCENT = 15
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no 0/O/1/I to avoid misreading
+const randomCode = (n: number) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('')
 const MAX_LINES = 20
 const MAX_QTY = 10
 const originOf = (c: { env: { SITE_URL?: string }; req: { url: string } }) => (c.env.SITE_URL || new URL(c.req.url).origin).replace(/\/+$/, '')
@@ -171,11 +175,27 @@ publicApi.post('/subscribe', async (c) => {
   const name = text(body.name, 120)
   if (!isEmail(email)) return c.json({ success: false, error: 'כתובת אימייל לא תקינה' }, 400)
   if (body.consent !== true) return c.json({ success: false, error: 'נא לאשר קבלת דיוור כדי להירשם' }, 400)
-  const code = 'WELCOME15'
-  const res = await c.env.DB.prepare('INSERT INTO subscribers (email, name, source, consent, discount_code) VALUES (?, ?, ?, 1, ?) ON CONFLICT(email) DO NOTHING')
+  const db = c.env.DB
+  const existing = await db.prepare('SELECT discount_code FROM subscribers WHERE email = ?').bind(email).first<{ discount_code: string | null }>()
+  if (existing) return c.json({ success: true, already: true, code: existing.discount_code, message: 'את כבר רשומה 💚' })
+
+  // Every sign-up gets its own single-use coupon, so a code cannot be shared or reused.
+  const code = `W${WELCOME_PERCENT}-${randomCode(8)}`
+  const res = await db
+    .prepare('INSERT INTO subscribers (email, name, source, consent, discount_code) VALUES (?, ?, ?, 1, ?) ON CONFLICT(email) DO NOTHING')
     .bind(email, name, text(body.source, 40) || 'footer', code)
     .run()
-  return c.json({ success: true, already: !res.meta.changes, code, message: res.meta.changes ? 'נרשמת בהצלחה 💚' : 'את כבר רשומה 💚' })
+  if (!res.meta.changes) {
+    const again = await db.prepare('SELECT discount_code FROM subscribers WHERE email = ?').bind(email).first<{ discount_code: string | null }>()
+    return c.json({ success: true, already: true, code: again?.discount_code ?? null, message: 'את כבר רשומה 💚' })
+  }
+  await db.prepare("INSERT INTO coupons (code, type, value, max_uses) VALUES (?, 'percent', ?, 1)").bind(code, WELCOME_PERCENT).run()
+  await sendMail(c.env, {
+    to: email,
+    subject: `ברוכה הבאה ל-EcoCraft Digital — ${WELCOME_PERCENT}% הנחה בשבילך`,
+    html: `<div dir="rtl" style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6"><p>תודה שנרשמת! הנה קוד ההנחה האישי שלך (${WELCOME_PERCENT}%, לשימוש חד-פעמי):</p><p style="font-size:22px;font-weight:bold;letter-spacing:1px" dir="ltr">${escapeHtml(code)}</p><p>מזינים אותו בשלב סיום ההזמנה באתר.</p></div>`
+  })
+  return c.json({ success: true, already: false, code, percent: WELCOME_PERCENT, message: 'נרשמת בהצלחה 💚' })
 })
 
 /** PayPlus sends the customer back here after paying. Confirms with our own DB, then hands over the download. */

@@ -419,7 +419,7 @@ function bind(){
       const res=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,consent,source:'footer'})});
       const data=await res.json().catch(()=>({}));
       if(!res.ok||!data.success){msg.textContent=data.error||'לא הצלחנו להירשם, נסי שוב';msg.style.color='var(--rose)';return;}
-      msg.textContent=data.message+' קוד ההנחה שלך: '+data.code+' (15% להזמנה)';
+      msg.textContent=data.message+(data.code?' קוד ההנחה האישי שלך: '+data.code+(data.already?'':' ('+(data.percent||15)+'% להזמנה, חד-פעמי)'):'');
       sb.disabled=true;
     }catch(err){msg.textContent='לא הצלחנו להירשם, נסי שוב';msg.style.color='var(--rose)';}
   };

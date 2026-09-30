@@ -16,7 +16,7 @@ CREATE TABLE coupons (
   expires_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-INSERT INTO coupons (code, type, value) VALUES ('WELCOME15', 'percent', 15);
+-- Welcome coupons (15%, single use) are created per subscriber by /api/subscribe.
 
 CREATE TABLE subscribers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
