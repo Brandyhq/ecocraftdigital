@@ -338,6 +338,59 @@ admin.get('/customers', async (c) => {
   return c.json({ success: true, customers: results })
 })
 
+/* ----------------------------------------------------------- subscribers & coupons */
+
+admin.get('/subscribers', async (c) => {
+  const { results } = await c.env.DB.prepare('SELECT id, email, name, source, consent, discount_code, created_at FROM subscribers ORDER BY id DESC LIMIT 5000').all()
+  return c.json({ success: true, subscribers: results })
+})
+
+// CSV neutralises spreadsheet formulas (=, +, -, @) so a hostile sign-up cannot run code in Excel.
+const csvCell = (v: unknown) => {
+  let s = String(v ?? '')
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s
+  return `"${s.replace(/"/g, '""')}"`
+}
+admin.get('/subscribers.csv', async (c) => {
+  const { results } = await c.env.DB.prepare('SELECT email, name, source, consent, discount_code, created_at FROM subscribers ORDER BY id').all<Record<string, unknown>>()
+  const rows = [['email', 'name', 'source', 'consent', 'discount_code', 'created_at'], ...results.map((r) => [r.email, r.name, r.source, r.consent, r.discount_code, r.created_at])]
+  return c.body('\uFEFF' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n'), 200, {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="subscribers.csv"'
+  })
+})
+
+admin.get('/coupons', async (c) => {
+  const { results } = await c.env.DB.prepare('SELECT code, type, value, active, max_uses, used_count, expires_at, created_at FROM coupons ORDER BY created_at DESC').all()
+  return c.json({ success: true, coupons: results })
+})
+
+admin.post('/coupons', async (c) => {
+  const body = await c.req.json().catch(() => null)
+  if (!isObject(body)) return c.json({ success: false, error: 'בקשה לא תקינה' }, 400)
+  const code = text(body.code, 40).toUpperCase()
+  const value = Number(body.value)
+  const type = body.type === 'fixed' ? 'fixed' : 'percent'
+  if (!/^[A-Z0-9_-]{3,40}$/.test(code)) return c.json({ success: false, error: 'קוד: 3–40 תווים באנגלית גדולה, ספרות, - או _' }, 400)
+  if (!Number.isFinite(value) || value <= 0 || (type === 'percent' && value > 100)) return c.json({ success: false, error: 'ערך הנחה לא תקין' }, 400)
+  const maxUses = body.max_uses === '' || body.max_uses == null ? null : Math.max(1, Math.floor(Number(body.max_uses)))
+  const expires = typeof body.expires_at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.expires_at) ? `${body.expires_at} 23:59:59` : null
+  try {
+    await c.env.DB.prepare('INSERT INTO coupons (code, type, value, max_uses, expires_at) VALUES (?, ?, ?, ?, ?)').bind(code, type, value, maxUses, expires).run()
+  } catch (e) {
+    if (isUnique(e)) return c.json({ success: false, error: 'הקוד כבר קיים' }, 409)
+    throw e
+  }
+  return c.json({ success: true })
+})
+
+admin.patch('/coupons/:code', async (c) => {
+  const body = await c.req.json().catch(() => null)
+  if (!isObject(body) || typeof body.active !== 'boolean') return c.json({ success: false, error: 'בקשה לא תקינה' }, 400)
+  const res = await c.env.DB.prepare('UPDATE coupons SET active = ? WHERE code = ?').bind(body.active ? 1 : 0, c.req.param('code')).run()
+  return res.meta.changes ? c.json({ success: true }) : c.json({ success: false, error: 'הקופון לא נמצא' }, 404)
+})
+
 /* ---------------------------------------------------------- site content */
 
 admin.get('/design', async (c) => c.json({ success: true, design: (await getSiteData(c.env.DB)).design }))

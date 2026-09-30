@@ -1,7 +1,13 @@
 SESSION_SECRET=change-me
 SETUP_TOKEN=change-me
-# Optional: automatic PayPal payments
-PAYPAL_CLIENT_ID=
-PAYPAL_CLIENT_SECRET=
-PAYPAL_ENV=sandbox
-PAYPAL_WEBHOOK_ID=
+# Canonical origin, e.g. https://ecocraftdigital.com (defaults to the request host)
+SITE_URL=
+# PayPlus (cards + Bit). Use sandbox keys and PAYPLUS_ENV=sandbox first.
+PAYPLUS_API_KEY=
+PAYPLUS_SECRET_KEY=
+PAYPLUS_PAGE_UID=
+PAYPLUS_ENV=sandbox
+# PAYPLUS_INVOICES=true   # ask PayPlus to issue an invoice/receipt (needs its invoice module)
+# Optional: email download links after payment (Resend)
+RESEND_API_KEY=
+MAIL_FROM=
