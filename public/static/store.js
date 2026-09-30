@@ -105,21 +105,56 @@ function render(){
   h+=footer();
   app.innerHTML=h;
   app.querySelector('main')?.classList.add('fade');
-  bind();updateCartBadge();
+  setDocMeta();bind();updateCartBadge();
 }
-function nav(name,extra){route={name,...(extra||{})};render();}
+/* ---------- URLs: every page has a real, crawlable path (the server pre-renders them) ---------- */
+function pathFor(r){
+  if(r.name==='shop')return '/shop';
+  if(r.name==='about')return '/about';
+  if(r.name==='cart')return '/cart';
+  if(r.name==='checkout')return '/checkout';
+  if(r.name==='product'&&r.id)return '/product/'+encodeURIComponent(r.id);
+  return '/';
+}
+function routeFromPath(){
+  const p=decodeURIComponent(location.pathname).replace(/\/+$/,'')||'/';
+  if(p==='/shop')return{name:'shop'};
+  if(p==='/about')return{name:'about'};
+  if(p==='/cart')return{name:'cart'};
+  if(p==='/checkout')return{name:'checkout'};
+  const m=p.match(/^\/product\/([^/]+)$/);
+  if(m&&findP(m[1]))return{name:'product',id:m[1]};
+  return{name:'home'};
+}
+function setDocMeta(){
+  const d=DATA.design,b=d.brandName||'EcoCraft Digital';
+  let t=b;
+  if(route.name==='product'){const p=findP(route.id);if(p)t=p.name+' | '+b;}
+  else if(route.name==='shop')t='כל המוצרים הדיגיטליים | '+b;
+  else if(route.name==='about')t='עלינו | '+b;
+  else if(route.name==='cart')t='עגלת קניות | '+b;
+  else if(route.name==='checkout')t='סיום הזמנה | '+b;
+  else if(d.heroTitle)t=b+' — '+d.heroTitle;
+  document.title=t;
+}
+function nav(name,extra,fromHistory){
+  route={name,...(extra||{})};
+  if(!fromHistory){try{history.pushState(null,'',pathFor(route));}catch(e){}}
+  render();
+}
+window.addEventListener('popstate',()=>{route=routeFromPath();render();});
 
 /* ---------- header ---------- */
 function header(){
   const d=DATA.design;
   const links=[['home','בית'],['shop','חנות'],['about','עלינו']];
   return `<header><div class="wrap"><nav class="nav">
-    <div class="logo" data-nav="home"><div class="mark">${esc(d.logoText||'ED')}</div>
-      <div class="name">${esc(d.brandName)}<small>${esc(d.brandSub||'')}</small></div></div>
+    <a class="logo" href="/" data-nav="home"><div class="mark">${esc(d.logoText||'ED')}</div>
+      <div class="name">${esc(d.brandName)}<small>${esc(d.brandSub||'')}</small></div></a>
     <div class="nav-links" id="navlinks">${links.map(l=>`<a data-nav="${l[0]}" class="${route.name===l[0]?'active':''}">${l[1]}</a>`).join('')}</div>
     <div class="nav-icons">
       <button class="icon-btn hamburger" id="burger" aria-label="תפריט"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-      <button class="icon-btn" data-nav="cart" aria-label="עגלה"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${cartCount()?`<span class="cart-count">${cartCount()}</span>`:''}</button>
+      <a class="icon-btn" href="/cart" data-nav="cart" aria-label="עגלה"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${cartCount()?`<span class="cart-count">${cartCount()}</span>`:''}</a>
     </div>
   </nav></div></header>`;
 }
@@ -190,7 +225,7 @@ function feat(ic,title,body){
 function cardHTML(p){
   return `<div class="card" data-prod="${p.id}">
     <div class="thumb">${p.tag?`<span class="card-tag ${p.tagType==='sage'?'sage':''}">${esc(p.tag)}</span>`:''}${coverFor(p)}</div>
-    <div class="body"><div class="kicker">${esc(p.catName||catName(p.cat))}</div><h3>${esc(p.name)}</h3>
+    <div class="body"><div class="kicker">${esc(p.catName||catName(p.cat))}</div><h3><a href="/product/${encodeURIComponent(p.id)}" data-plink>${esc(p.name)}</a></h3>
       <div class="desc">${esc(p.short)}</div>
       <div class="foot"><div class="price">${money(p.price)}${p.old?`<span class="old">${money(p.old)}</span>`:''}</div>
         <button class="add-mini" data-add="${p.id}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>הוספה</button>
@@ -336,11 +371,15 @@ function footer(){
    BINDINGS
    ============================================================ */
 function bind(){
-  app.querySelectorAll('[data-nav]').forEach(el=>el.onclick=()=>nav(el.dataset.nav));
+  app.querySelectorAll('[data-nav]').forEach(el=>{
+    if(el.tagName==='A'&&!el.getAttribute('href'))el.setAttribute('href',pathFor({name:el.dataset.nav}));
+    el.onclick=e=>{e.preventDefault();nav(el.dataset.nav);};
+  });
+  app.querySelectorAll('[data-plink]').forEach(el=>el.onclick=e=>e.preventDefault()); /* the card handler navigates */
   app.querySelectorAll('[data-prod]').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-add]'))return;nav('product',{id:el.dataset.prod});});
   app.querySelectorAll('[data-add]').forEach(el=>el.onclick=e=>{e.stopPropagation();addToCart(el.dataset.add);});
   app.querySelectorAll('[data-buy]').forEach(el=>el.onclick=e=>{e.stopPropagation();addToCart(el.dataset.buy,true);nav('checkout');});
-  app.querySelectorAll('[data-cat]').forEach(el=>el.onclick=()=>{activeCat=el.dataset.cat;nav('shop');});
+  app.querySelectorAll('[data-cat]').forEach(el=>{if(el.tagName==='A')el.setAttribute('href','/shop');el.onclick=e=>{e.preventDefault();activeCat=el.dataset.cat;nav('shop');};});
   app.querySelectorAll('[data-inc]').forEach(el=>el.onclick=()=>{setQty(el.dataset.inc,(cart[el.dataset.inc]||0)+1);render();});
   app.querySelectorAll('[data-dec]').forEach(el=>el.onclick=()=>{setQty(el.dataset.dec,(cart[el.dataset.dec]||0)-1);render();});
   app.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{delete cart[el.dataset.remove];saveCart();render();});
@@ -392,6 +431,7 @@ if(q.get('paid')){
   const m={cancelled:'התשלום בוטל — העגלה שלך נשמרה.',pending:'התשלום עדיין בעיבוד. נעדכן ברגע שיאושר.',failed:'לא הצלחנו לאמת את התשלום. אם חויבת, פני אלינו עם מספר ההזמנה.'};
   bootToast=[m[q.get('payment')]||m.failed,q.get('payment')!=='cancelled'&&q.get('payment')!=='pending'];
 }
+if(!q.get('paid'))route=routeFromPath();
 if(q.get('paid')||q.get('payment')){try{history.replaceState(null,'',location.pathname);}catch(e){}}
 render();
 if(bootToast)toast(bootToast[0],bootToast[1]);

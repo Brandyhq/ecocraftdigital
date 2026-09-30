@@ -4,6 +4,8 @@ export type Bindings = {
   SESSION_SECRET: string
   /** One-time token required to create the very first admin account. */
   SETUP_TOKEN?: string
+  /** Optional canonical origin (e.g. https://ecocraftdigital.com). Defaults to the request host. */
+  SITE_URL?: string
   /** PayPal REST app credentials. When both are set, checkout uses automatic PayPal payments. */
   PAYPAL_CLIENT_ID?: string
   PAYPAL_CLIENT_SECRET?: string
