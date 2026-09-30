@@ -49,7 +49,7 @@ function applyTheme(){
 
 /* ---------- state ---------- */
 let cart=loadCart(), route={name:'home'}, activeCat='all';
-let orderResult=null, placing=false;
+let orderResult=null, placing=false, coupon=null, draft={name:'',email:'',phone:''};
 
 function loadCart(){try{return JSON.parse(localStorage.getItem('ec_cart')||'{}');}catch(e){return{};}}
 function saveCart(){try{localStorage.setItem('ec_cart',JSON.stringify(cart));}catch(e){}}
@@ -68,7 +68,7 @@ function setQty(id,q){if(q<=0)delete cart[id];else cart[id]=q;saveCart();}
 /* ---------- orders ---------- */
 async function placeOrder(customer){
   const items=cartItems().map(({p,q})=>({id:p.id,quantity:q}));
-  const res=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer,items})});
+  const res=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer,items,coupon:coupon?coupon.code:''})});
   const data=await res.json().catch(()=>({}));
   if(!res.ok||!data.success)throw new Error(data.error||'שגיאה ביצירת ההזמנה');
   return data.order;
@@ -301,9 +301,9 @@ function checkoutPage(){
   return `<main><div class="page-head"><div class="wrap"><span class="eyebrow">תשלום</span><h1>סיום הזמנה</h1></div></div>
   <div class="wrap"><div class="co-layout"><div>
     <div class="co-card"><h3><span class="step-n">1</span> פרטי הלקוח</h3><p class="co-sub">לכתובת זו יישלחו הקבלה והקובץ הדיגיטלי.</p>
-      <div class="field"><label for="coName">שם מלא</label><input type="text" id="coName" autocomplete="name" placeholder="השם שלך" maxlength="120"></div>
-      <div class="field"><label for="coEmail">כתובת אימייל</label><input type="email" id="coEmail" autocomplete="email" placeholder="name@example.com" maxlength="200"></div>
-      <div class="field"><label for="coPhone">טלפון (לא חובה)</label><input type="tel" id="coPhone" autocomplete="tel" placeholder="050-0000000" maxlength="30"></div></div>
+      <div class="field"><label for="coName">שם מלא</label><input type="text" id="coName" autocomplete="name" placeholder="השם שלך" maxlength="120" value="${esc(draft.name)}"></div>
+      <div class="field"><label for="coEmail">כתובת אימייל</label><input type="email" id="coEmail" autocomplete="email" placeholder="name@example.com" maxlength="200" value="${esc(draft.email)}"></div>
+      <div class="field"><label for="coPhone">טלפון (לא חובה)</label><input type="tel" id="coPhone" autocomplete="tel" placeholder="050-0000000" maxlength="30" value="${esc(draft.phone)}"></div></div>
     <div class="co-card"><h3><span class="step-n">2</span> תשלום ב-PayPal</h3>
       <p class="co-sub">אחרי שליחת ההזמנה תקבלי קישור תשלום מאובטח ב-PayPal. הקובץ נשלח לאימייל ברגע שהתשלום מאושר.</p>
       <div class="pay-lines">${items.map(({p,q})=>`<div class="pay-line"><div class="pl-info"><div class="pi">${esc(p.name)}</div><div class="pd-note">${money(p.price)}${q>1?' × '+q:''}</div></div></div>`).join('')}</div>
@@ -311,7 +311,9 @@ function checkoutPage(){
   </div>
   <div class="summary"><h3>ההזמנה שלך</h3>
     ${items.map(({p,q})=>`<div class="sum-row"><span>${esc(p.name)} ${q>1?'× '+q:''}</span><span>${money(p.price*q)}</span></div>`).join('')}
-    <div class="sum-row total"><span>סה"כ לתשלום</span><b>${money(sub)}</b></div>
+    <div class="promo" style="margin-top:12px"><input type="text" placeholder="קוד הנחה" id="coCoupon" value="${coupon?esc(coupon.code):''}" dir="ltr"><button class="btn btn-ghost btn-sm" id="applyCoupon">החלה</button></div>
+    ${coupon?`<div class="sum-row"><span>הנחה (${esc(coupon.code)})</span><span>−${money(coupon.discount)}</span></div>`:''}
+    <div class="sum-row total"><span>סה"כ לתשלום</span><b>${money(coupon?Math.round((sub-coupon.discount)*100)/100:sub)}</b></div>
     <button class="btn btn-primary btn-block" style="margin-top:16px" id="placeOrder">שליחת הזמנה ומעבר לתשלום</button>
     <p style="text-align:center;font-size:13px;color:var(--ink-soft);margin:12px 0 0">🔒 תשלום מאובטח · הורדה מיידית</p></div>
   </div></div></main>`;
@@ -361,7 +363,8 @@ function footer(){
       <p>${esc(d.footerTagline||'')}</p></div>
     <div><h5>חנות</h5>${DATA.categories.map(c=>`<a data-cat="${c.id}">${esc(c.name)}</a>`).join('')}<a data-nav="shop">כל המוצרים</a></div>
     <div><h5>מידע</h5><a data-nav="about">עלינו</a><a data-nav="shop">איך זה עובד</a><a data-nav="home">שאלות נפוצות</a><a data-nav="home">צור קשר</a></div>
-    <div><h5>הישארי מעודכנת</h5><p>קבלי טיפים ומבצעים ישירות למייל.</p><div class="newsletter"><input type="email" placeholder="האימייל שלך"><button class="btn btn-primary" id="subBtn">הרשמה</button></div></div>
+    <div><h5>הישארי מעודכנת</h5><p>טיפים, מבצעים והטבה של 15% להזמנה הראשונה.</p><div class="newsletter"><input type="email" id="subEmail" placeholder="האימייל שלך" autocomplete="email"><button class="btn btn-primary" id="subBtn">הרשמה</button></div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-top:10px;cursor:pointer"><input type="checkbox" id="subConsent" style="margin-top:3px"><span>מאשרת קבלת מיילים ועדכונים מ-EcoCraft Digital. אפשר להסיר את עצמי בכל עת.</span></label><p id="subMsg" style="font-size:13.5px;margin-top:8px"></p></div></div>
   </div><div class="foot-bottom"><span>© 2026 ${esc(d.brandName)} · כל הזכויות שמורות</span>
     <div class="fb-links"><span id="themeToggle">🌙 מצב כהה / בהיר</span></div>
   </div></div></footer>`;
@@ -384,6 +387,17 @@ function bind(){
   app.querySelectorAll('[data-dec]').forEach(el=>el.onclick=()=>{setQty(el.dataset.dec,(cart[el.dataset.dec]||0)-1);render();});
   app.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{delete cart[el.dataset.remove];saveCart();render();});
   const b=document.getElementById('burger');if(b)b.onclick=()=>document.getElementById('navlinks').classList.toggle('open');
+  const ac=document.getElementById('applyCoupon');if(ac)ac.onclick=async()=>{
+    const code=document.getElementById('coCoupon').value.trim();
+    draft={name:document.getElementById('coName').value,email:document.getElementById('coEmail').value,phone:document.getElementById('coPhone').value};
+    if(!code){coupon=null;render();return;}
+    try{
+      const res=await fetch('/api/coupon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,items:cartItems().map(({p,q})=>({id:p.id,quantity:q}))})});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok||!data.success){coupon=null;render();toast(esc(data.error||'קוד ההנחה אינו תקף'),true);return;}
+      coupon={code:data.code,discount:data.discount};render();toast('קוד ההנחה הוחל ✓');
+    }catch(err){toast('לא ניתן לבדוק את הקוד כרגע',true);}
+  };
   const po=document.getElementById('placeOrder');if(po)po.onclick=async()=>{
     if(placing)return;
     const name=document.getElementById('coName').value.trim(), email=document.getElementById('coEmail').value.trim(), phone=document.getElementById('coPhone').value.trim();
@@ -397,8 +411,18 @@ function bind(){
     }catch(err){toast(esc(err.message),true);po.disabled=false;po.textContent='שליחת הזמנה ומעבר לתשלום';}
     finally{placing=false;}
   };
-  const ap=document.getElementById('applyPromo');if(ap)ap.onclick=()=>toast('קוד קופון אינו זמין בהדגמה');
-  const sb=document.getElementById('subBtn');if(sb)sb.onclick=()=>toast('נרשמת לרשימת התפוצה ✓');
+  const ap=document.getElementById('applyPromo');if(ap)ap.onclick=()=>toast('קוד הנחה מזינים בשלב סיום ההזמנה');
+  const sb=document.getElementById('subBtn');if(sb)sb.onclick=async()=>{
+    const email=document.getElementById('subEmail').value.trim(),consent=document.getElementById('subConsent').checked,msg=document.getElementById('subMsg');
+    msg.style.color='inherit';
+    try{
+      const res=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,consent,source:'footer'})});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok||!data.success){msg.textContent=data.error||'לא הצלחנו להירשם, נסי שוב';msg.style.color='var(--rose)';return;}
+      msg.textContent=data.message+(data.code?' קוד ההנחה האישי שלך: '+data.code+(data.already?'':' ('+(data.percent||15)+'% להזמנה, חד-פעמי)'):'');
+      sb.disabled=true;
+    }catch(err){msg.textContent='לא הצלחנו להירשם, נסי שוב';msg.style.color='var(--rose)';}
+  };
   const tt=document.getElementById('themeToggle');if(tt)tt.onclick=toggleTheme;
 }
 function updateCartBadge(){

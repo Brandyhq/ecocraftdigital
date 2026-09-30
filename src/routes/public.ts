@@ -1,7 +1,10 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../env'
 import { escapeHtml } from '../lib/html'
-import { createPayPalOrder, paypalEnabled, settlePayPalOrder, verifyWebhook } from '../lib/paypal'
+import { applyCoupon } from '../lib/coupons'
+import { sendMail } from '../lib/mail'
+import { markOrderPaid } from '../lib/payments'
+import { createPaymentLink, extractCallback, payplusEnabled, verifyCallback } from '../lib/payplus'
 import { getSiteData } from '../lib/site'
 import { isEmail, isObject, text } from '../lib/validate'
 
@@ -15,25 +18,50 @@ const blob = (data: ArrayBuffer | number[]) => (Array.isArray(data) ? new Uint8A
 
 publicApi.get('/site', async (c) => c.json({ success: true, ...(await getSiteData(c.env.DB)) }))
 
-/** PayPal server-to-server notifications. Handling is idempotent and re-checks state with PayPal itself. */
-publicApi.post('/paypal/webhook', async (c) => {
-  if (!paypalEnabled(c.env)) return c.json({ success: false }, 404)
-  const event = await c.req.json().catch(() => null)
-  if (!isObject(event)) return c.json({ success: false }, 400)
-  if (c.env.PAYPAL_WEBHOOK_ID && !(await verifyWebhook(c.env, c.req.raw.headers, event))) return c.json({ success: false }, 401)
-  const resource = isObject(event.resource) ? event.resource : {}
-  const related = isObject(resource.supplementary_data) && isObject(resource.supplementary_data.related_ids) ? resource.supplementary_data.related_ids : {}
-  const paypalOrderId = event.event_type === 'CHECKOUT.ORDER.APPROVED' ? resource.id : related.order_id
-  if (typeof paypalOrderId === 'string') await settlePayPalOrder(c.env, paypalOrderId)
-  return c.json({ success: true })
-})
-
+const WELCOME_PERCENT = 15
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no 0/O/1/I to avoid misreading
+const randomCode = (n: number) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('')
 const MAX_LINES = 20
 const MAX_QTY = 10
+const originOf = (c: { env: { SITE_URL?: string }; req: { url: string } }) => (c.env.SITE_URL || new URL(c.req.url).origin).replace(/\/+$/, '')
+const round2 = (n: number) => Math.round(n * 100) / 100
+
+type Line = { id: number; slug: string; name: string; price: number; paypal_url: string; quantity: number }
+
+/** Resolves cart items (slug + quantity) against the database. Prices always come from D1. */
+async function priceCart(db: D1Database, rawItems: unknown[]): Promise<{ lines: Line[]; subtotal: number } | { error: string; status: 400 | 409 }> {
+  const wanted = new Map<string, number>()
+  for (const it of rawItems.slice(0, MAX_LINES)) {
+    if (!isObject(it)) continue
+    const slug = text(it.id, 60)
+    const qty = Math.floor(Number(it.quantity))
+    if (slug && qty > 0) wanted.set(slug, Math.min(MAX_QTY, (wanted.get(slug) ?? 0) + qty))
+  }
+  if (wanted.size === 0) return { error: 'העגלה ריקה', status: 400 }
+  const slugs = [...wanted.keys()]
+  const { results } = await db
+    .prepare(`SELECT id, slug, name, price, paypal_url FROM products WHERE active = 1 AND slug IN (${slugs.map(() => '?').join(',')})`)
+    .bind(...slugs)
+    .all<Omit<Line, 'quantity'>>()
+  if (results.length !== slugs.length) return { error: 'חלק מהמוצרים אינם זמינים עוד', status: 409 }
+  const lines = results.map((p) => ({ ...p, quantity: wanted.get(p.slug)! }))
+  return { lines, subtotal: round2(lines.reduce((sum, l) => sum + l.price * l.quantity, 0)) }
+}
+
+/** Live preview of a coupon for the checkout page. */
+publicApi.post('/coupon', async (c) => {
+  const body = await c.req.json().catch(() => null)
+  if (!isObject(body) || !Array.isArray(body.items)) return c.json({ success: false, error: 'בקשה לא תקינה' }, 400)
+  const cart = await priceCart(c.env.DB, body.items)
+  if ('error' in cart) return c.json({ success: false, error: cart.error }, cart.status)
+  const r = await applyCoupon(c.env.DB, body.code, cart.subtotal)
+  if (!r.ok) return c.json({ success: false, error: r.error }, 400)
+  return c.json({ success: true, code: r.code, discount: r.discount, total: round2(cart.subtotal - r.discount) })
+})
 
 /**
- * Creates a pending order. Prices are always taken from the database — the
- * client only says which products (by slug) and how many.
+ * Creates a pending order and, when PayPlus is configured, a hosted payment page for it.
+ * Totals and discounts are computed here from D1 — the browser only names products and a coupon code.
  */
 publicApi.post('/orders', async (c) => {
   const body = await c.req.json().catch(() => null)
@@ -46,25 +74,22 @@ publicApi.post('/orders', async (c) => {
   if (!name) return c.json({ success: false, error: 'נא למלא שם מלא' }, 400)
   if (!isEmail(email)) return c.json({ success: false, error: 'כתובת אימייל לא תקינה' }, 400)
 
-  const wanted = new Map<string, number>()
-  for (const it of body.items.slice(0, MAX_LINES)) {
-    if (!isObject(it)) continue
-    const slug = text(it.id, 60)
-    const qty = Math.floor(Number(it.quantity))
-    if (slug && qty > 0) wanted.set(slug, Math.min(MAX_QTY, (wanted.get(slug) ?? 0) + qty))
-  }
-  if (wanted.size === 0) return c.json({ success: false, error: 'העגלה ריקה' }, 400)
-
   const db = c.env.DB
-  const slugs = [...wanted.keys()]
-  const { results } = await db
-    .prepare(`SELECT id, slug, name, price, paypal_url FROM products WHERE active = 1 AND slug IN (${slugs.map(() => '?').join(',')})`)
-    .bind(...slugs)
-    .all<{ id: number; slug: string; name: string; price: number; paypal_url: string }>()
-  if (results.length !== slugs.length) return c.json({ success: false, error: 'חלק מהמוצרים אינם זמינים עוד' }, 409)
+  const cart = await priceCart(db, body.items)
+  if ('error' in cart) return c.json({ success: false, error: cart.error }, cart.status)
+  const { lines, subtotal } = cart
 
-  const lines = results.map((p) => ({ ...p, quantity: wanted.get(p.slug)! }))
-  const total = Math.round(lines.reduce((sum, l) => sum + l.price * l.quantity, 0) * 100) / 100
+  let couponCode: string | null = null
+  let discount = 0
+  if (typeof body.coupon === 'string' && body.coupon.trim()) {
+    const r = await applyCoupon(db, body.coupon, subtotal)
+    if (!r.ok) return c.json({ success: false, error: r.error }, 400)
+    couponCode = r.code
+    discount = r.discount
+  }
+  const total = round2(subtotal - discount)
+  const online = payplusEnabled(c.env)
+  const orderRef = crypto.randomUUID()
 
   await db
     .prepare(
@@ -76,8 +101,8 @@ publicApi.post('/orders', async (c) => {
   const customer = await db.prepare('SELECT id FROM customers WHERE email = ?').bind(email).first<{ id: number }>()
 
   const order = await db
-    .prepare(`INSERT INTO orders (customer_id, total_amount, status) VALUES (?, ?, 'pending')`)
-    .bind(customer!.id, total)
+    .prepare(`INSERT INTO orders (customer_id, total_amount, status, order_ref, payment_provider, coupon_code, discount_amount) VALUES (?, ?, 'pending', ?, ?, ?, ?)`)
+    .bind(customer!.id, total, orderRef, online ? 'payplus' : 'manual', couponCode, discount)
     .run()
   const orderId = order.meta.last_row_id
   await db.batch(
@@ -88,21 +113,18 @@ publicApi.post('/orders', async (c) => {
     )
   )
 
-  // Automatic PayPal checkout when configured; otherwise the storefront falls back to per-product PayPal.me links.
   let approveUrl: string | null = null
-  if (paypalEnabled(c.env)) {
+  if (online) {
     try {
-      const brand = ((await getSiteData(db)).design as { brandName?: string }).brandName || 'EcoCraft Digital'
-      const pp = await createPayPalOrder(
-        c.env,
-        { id: orderId, total, items: lines.map((l) => ({ name: l.name, price: l.price, quantity: l.quantity })) },
-        new URL(c.req.url).origin,
-        brand
-      )
-      await db.prepare('UPDATE orders SET paypal_order_id = ? WHERE id = ?').bind(pp.paypalOrderId, orderId).run()
-      approveUrl = pp.approveUrl
+      // With a discount the itemised lines would not add up to the charged amount, so send one line for the order.
+      const items = discount > 0
+        ? [{ name: `הזמנה #${orderId} (כולל הנחה)`, quantity: 1, price: total }]
+        : lines.map((l) => ({ name: l.name, quantity: l.quantity, price: l.price }))
+      approveUrl = await createPaymentLink(c.env, { orderRef, amount: total, items, customer: { name, email, phone }, origin: originOf(c) })
     } catch (e) {
       console.error(e)
+      await db.prepare("UPDATE orders SET status = 'cancelled', notes = 'שגיאה ביצירת דף התשלום' WHERE id = ?").bind(orderId).run()
+      return c.json({ success: false, error: 'תקלה זמנית בפתיחת דף התשלום. נסי שוב בעוד רגע.' }, 502)
     }
   }
 
@@ -110,22 +132,92 @@ publicApi.post('/orders', async (c) => {
     success: true,
     order: {
       id: orderId,
+      ref: orderRef,
       total,
+      discount,
+      couponCode,
       approveUrl,
-      items: lines.map((l) => ({ name: l.name, price: l.price, quantity: l.quantity, paypalUrl: l.paypal_url }))
+      items: lines.map((l) => ({ name: l.name, price: l.price, quantity: l.quantity, paypalUrl: online ? '' : l.paypal_url }))
     }
   })
 })
 
-/** Where PayPal sends the customer after approving: capture server-side, then hand them to the storefront. */
-publicFiles.get('/paypal/return', async (c) => {
-  const paypalOrderId = c.req.query('token') ?? ''
-  const result = paypalOrderId && paypalEnabled(c.env) ? await settlePayPalOrder(c.env, paypalOrderId).catch(() => 'failed' as const) : 'failed'
-  if (result !== 'paid') return c.redirect(`/?payment=${result === 'pending' ? 'pending' : 'failed'}`, 302)
-  const row = await c.env.DB.prepare('SELECT download_token FROM orders WHERE paypal_order_id = ?').bind(paypalOrderId).first<{ download_token: string }>()
-  return c.redirect(`/?paid=${encodeURIComponent(row!.download_token)}`, 302)
+/** PayPlus server-to-server callback. Authenticated by HMAC; idempotent; fails closed on anything unexpected. */
+publicApi.post('/payplus/callback', async (c) => {
+  if (!payplusEnabled(c.env)) return c.json({ success: false }, 404)
+  const raw = await c.req.text()
+  if (!(await verifyCallback(c.env, raw, c.req.raw.headers))) return c.json({ success: false, error: 'unauthorized' }, 401)
+  const info = extractCallback(JSON.parse(raw))
+  if (!info) {
+    console.error('PayPlus callback without order reference')
+    return c.json({ success: true }) // acknowledged so PayPlus does not retry forever; nothing was marked paid
+  }
+  const order = await c.env.DB.prepare('SELECT id, status, total_amount FROM orders WHERE order_ref = ?').bind(info.ref).first<{ id: number; status: string; total_amount: number }>()
+  if (!order) return c.json({ success: true })
+  if (!info.approved) {
+    await c.env.DB.prepare("UPDATE orders SET status = 'cancelled', notes = 'התשלום נכשל או בוטל ב-PayPlus' WHERE id = ? AND status = 'pending'").bind(order.id).run()
+    return c.json({ success: true })
+  }
+  // Never trust an approval whose amount we cannot match to the order.
+  if (info.amount === null || Math.abs(info.amount - order.total_amount) > 0.005 || !info.transactionUid) {
+    console.error('PayPlus callback amount/uid mismatch for order', order.id, info)
+    return c.json({ success: true })
+  }
+  await markOrderPaid(c.env, originOf(c), order.id, info.transactionUid)
+  return c.json({ success: true })
 })
-publicFiles.get('/paypal/cancel', (c) => c.redirect('/?payment=cancelled', 302))
+
+/** Newsletter sign-up. Requires explicit consent; a repeat sign-up is answered kindly, not as an error. */
+publicApi.post('/subscribe', async (c) => {
+  const body = await c.req.json().catch(() => null)
+  if (!isObject(body)) return c.json({ success: false, error: 'בקשה לא תקינה' }, 400)
+  const email = text(body.email, 200).toLowerCase()
+  const name = text(body.name, 120)
+  if (!isEmail(email)) return c.json({ success: false, error: 'כתובת אימייל לא תקינה' }, 400)
+  if (body.consent !== true) return c.json({ success: false, error: 'נא לאשר קבלת דיוור כדי להירשם' }, 400)
+  const db = c.env.DB
+  const existing = await db.prepare('SELECT discount_code FROM subscribers WHERE email = ?').bind(email).first<{ discount_code: string | null }>()
+  if (existing) return c.json({ success: true, already: true, code: existing.discount_code, message: 'את כבר רשומה 💚' })
+
+  // Every sign-up gets its own single-use coupon, so a code cannot be shared or reused.
+  const code = `W${WELCOME_PERCENT}-${randomCode(8)}`
+  const res = await db
+    .prepare('INSERT INTO subscribers (email, name, source, consent, discount_code) VALUES (?, ?, ?, 1, ?) ON CONFLICT(email) DO NOTHING')
+    .bind(email, name, text(body.source, 40) || 'footer', code)
+    .run()
+  if (!res.meta.changes) {
+    const again = await db.prepare('SELECT discount_code FROM subscribers WHERE email = ?').bind(email).first<{ discount_code: string | null }>()
+    return c.json({ success: true, already: true, code: again?.discount_code ?? null, message: 'את כבר רשומה 💚' })
+  }
+  await db.prepare("INSERT INTO coupons (code, type, value, max_uses) VALUES (?, 'percent', ?, 1)").bind(code, WELCOME_PERCENT).run()
+  await sendMail(c.env, {
+    to: email,
+    subject: `ברוכה הבאה ל-EcoCraft Digital — ${WELCOME_PERCENT}% הנחה בשבילך`,
+    html: `<div dir="rtl" style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6"><p>תודה שנרשמת! הנה קוד ההנחה האישי שלך (${WELCOME_PERCENT}%, לשימוש חד-פעמי):</p><p style="font-size:22px;font-weight:bold;letter-spacing:1px" dir="ltr">${escapeHtml(code)}</p><p>מזינים אותו בשלב סיום ההזמנה באתר.</p></div>`
+  })
+  return c.json({ success: true, already: false, code, percent: WELCOME_PERCENT, message: 'נרשמת בהצלחה 💚' })
+})
+
+/** PayPlus sends the customer back here after paying. Confirms with our own DB, then hands over the download. */
+publicFiles.get('/checkout/success', async (c) => {
+  const o = await c.env.DB.prepare('SELECT status, download_token FROM orders WHERE order_ref = ?').bind(c.req.query('ref') ?? '').first<{ status: string; download_token: string | null }>()
+  if (!o) return c.redirect('/?payment=failed', 302)
+  if ((o.status === 'paid' || o.status === 'delivered') && o.download_token) return c.redirect(`/?paid=${encodeURIComponent(o.download_token)}`, 302)
+  if (o.status === 'cancelled') return c.redirect('/?payment=failed', 302)
+  // Payment not confirmed by the callback yet: wait a few seconds and re-check.
+  const n = Math.min(Number(c.req.query('n')) || 0, 30)
+  const ref = encodeURIComponent(c.req.query('ref') ?? '')
+  return c.html(
+    `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+${n < 30 ? `<meta http-equiv="refresh" content="3;url=/checkout/success?ref=${ref}&n=${n + 1}">` : ''}<title>מאשרים תשלום…</title><link rel="stylesheet" href="/static/store.css"></head>
+<body><main><div class="wrap"><div class="success"><h1>${n < 30 ? 'מאשרים את התשלום…' : 'התשלום עדיין בעיבוד'}</h1>
+<p>${n < 30 ? 'זה לוקח כמה שניות. אל תסגרי את הדף.' : 'אם חויבת, קישור ההורדה יגיע אלייך במייל בקרוב. אפשר גם לפנות אלינו עם מספר ההזמנה.'}</p></div></div></main></body></html>`
+  )
+})
+publicFiles.get('/checkout/failure', async (c) => {
+  await c.env.DB.prepare("UPDATE orders SET status = 'cancelled' WHERE order_ref = ? AND status = 'pending'").bind(c.req.query('ref') ?? '').run()
+  return c.redirect('/?payment=failed', 302)
+})
 
 /** Public images uploaded from the back office. Ids are random, so responses can be cached forever. */
 publicFiles.get('/media/:id', async (c) => {

@@ -57,6 +57,7 @@ const NAV = [
   ['products', 'מוצרים', '🛍️'],
   ['categories', 'קטגוריות', '🗂️'],
   ['customers', 'לקוחות', '👥'],
+  ['marketing', 'נרשמים וקופונים', '💌'],
   ['content', 'תוכן האתר', '🎨'],
   ['settings', 'הגדרות', '⚙️']
 ]
@@ -177,6 +178,29 @@ const views = {
     }
   }),
 
+  marketing: guard(async function () {
+    const [sub, cp] = await Promise.all([api('GET', '/subscribers'), api('GET', '/coupons')])
+    main().innerHTML = `<div class="head"><h1>נרשמים וקופונים</h1></div>
+      <div class="card"><h3>קופונים</h3>
+        ${cp.coupons.length ? `<div class="tbl-wrap"><table><thead><tr><th>קוד</th><th>הנחה</th><th>שימושים</th><th>תוקף</th><th></th></tr></thead><tbody>${cp.coupons.map((k) => `<tr><td><b dir="ltr">${esc(k.code)}</b></td><td>${k.type === 'percent' ? k.value + '%' : money(k.value)}</td><td>${k.used_count}${k.max_uses ? ' / ' + k.max_uses : ''}</td><td class="muted small">${k.expires_at ? fmtDate(k.expires_at) : '—'}</td>
+          <td><div class="actions"><span class="pill ${k.active ? 'paid' : 'off'}">${k.active ? 'פעיל' : 'כבוי'}</span><button class="btn ghost sm" data-act="couponToggle" data-code="${esc(k.code)}" data-active="${k.active ? 0 : 1}">${k.active ? 'כיבוי' : 'הפעלה'}</button></div></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">אין קופונים.</p>'}
+        <form id="couponForm" class="row" style="margin-top:16px;align-items:end">
+          <div class="field"><label>קוד חדש</label><input type="text" name="code" placeholder="SPRING10" dir="ltr" required></div>
+          <div class="field"><label>סוג</label><select name="type"><option value="percent">אחוזים</option><option value="fixed">סכום קבוע (₪)</option></select></div>
+          <div class="field"><label>ערך</label><input type="number" name="value" min="1" step="0.01" required></div>
+          <div class="field"><label>מקסימום שימושים (ריק = ללא הגבלה)</label><input type="number" name="max_uses" min="1"></div>
+          <div class="field"><label>תוקף עד</label><input type="date" name="expires_at"></div>
+          <div class="field"><button class="btn primary" type="submit">הוספה</button></div></form></div>
+      <div class="head"><h2 style="font-size:22px;color:var(--sage-deep)">נרשמים לדיוור (${sub.subscribers.length})</h2><span class="grow"></span><a class="btn ghost" href="/api/admin/subscribers.csv">ייצוא CSV</a></div>
+      ${sub.subscribers.length ? `<div class="tbl-wrap"><table><thead><tr><th>אימייל</th><th>שם</th><th>מקור</th><th>אישור דיוור</th><th>נרשמה</th></tr></thead><tbody>${sub.subscribers.map((x) => `<tr><td dir="ltr" style="text-align:start">${esc(x.email)}</td><td>${esc(x.name || '—')}</td><td>${esc(x.source)}</td><td>${x.consent ? '✓' : '—'}</td><td class="muted small nowrap">${fmtDate(x.created_at)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="card empty">אין נרשמים עדיין.</div>'}`
+    $('#couponForm').onsubmit = guard(async (e) => {
+      e.preventDefault()
+      await api('POST', '/coupons', Object.fromEntries(new FormData(e.target)))
+      toast('הקופון נוסף ✓')
+      views.marketing()
+    })
+  }),
+
   content: guard(async function () {
     const [d, p] = await Promise.all([api('GET', '/design'), api('GET', '/products')])
     state.cache.design = d.design
@@ -250,7 +274,7 @@ async function openOrder(id) {
     : ''
   const el = modal(`<h3>הזמנה #${o.id} ${pill(o.status)}</h3>
     <dl class="kv"><dt>לקוח</dt><dd>${esc(o.customer_name)}</dd><dt>אימייל</dt><dd><a href="mailto:${esc(o.customer_email)}">${esc(o.customer_email)}</a></dd>
-    <dt>טלפון</dt><dd>${esc(o.customer_phone || '—')}</dd><dt>נוצרה</dt><dd>${fmtDate(o.created_at)}</dd><dt>שולמה</dt><dd>${fmtDate(o.paid_at)}</dd><dt>PayPal</dt><dd>${o.paypal_capture_id ? 'אושר אוטומטית · ' + esc(o.paypal_capture_id) : o.paypal_order_id ? 'ממתין לאישור לקוח' : 'ידני'}</dd></dl>
+    <dt>טלפון</dt><dd>${esc(o.customer_phone || '—')}</dd><dt>נוצרה</dt><dd>${fmtDate(o.created_at)}</dd><dt>שולמה</dt><dd>${fmtDate(o.paid_at)}</dd><dt>תשלום</dt><dd>${o.payment_provider === 'payplus' ? 'PayPlus' + (o.payplus_transaction_uid ? ' · ' + esc(o.payplus_transaction_uid) : '') : 'ידני'}</dd>${o.coupon_code ? `<dt>קופון</dt><dd>${esc(o.coupon_code)} (−${money(o.discount_amount)})</dd>` : ''}</dl>
     <div class="tbl-wrap" style="margin-bottom:14px"><table><tbody>${o.items.map((i) => `<tr><td>${esc(i.product_name)}</td><td>× ${i.quantity}</td><td>${money(i.price * i.quantity)}</td></tr>`).join('')}
       <tr><td colspan="2"><b>סה"כ</b></td><td><b>${money(o.total_amount)}</b></td></tr></tbody></table></div>
     <div class="row"><div class="field"><label>סטטוס</label><select id="ordStatus">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${o.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
@@ -401,6 +425,10 @@ const actions = {
   }),
   closeModal,
   order: guard((el) => openOrder(el.dataset.id)),
+  couponToggle: guard(async (el) => {
+    await api('PATCH', `/coupons/${encodeURIComponent(el.dataset.code)}`, { active: el.dataset.active === '1' })
+    views.marketing()
+  }),
   orderFilter: (el) => {
     state.cache.orderFilter.status = el.dataset.status
     views.orders()

@@ -6,15 +6,19 @@ export type Bindings = {
   SETUP_TOKEN?: string
   /** Optional canonical origin (e.g. https://ecocraftdigital.com). Defaults to the request host. */
   SITE_URL?: string
-  /** PayPal REST app credentials. When both are set, checkout uses automatic PayPal payments. */
-  PAYPAL_CLIENT_ID?: string
-  PAYPAL_CLIENT_SECRET?: string
-  /** 'live' or 'sandbox' (default). */
-  PAYPAL_ENV?: string
-  /** Optional: enables webhook signature verification. */
-  PAYPAL_WEBHOOK_ID?: string
-  /** Optional override of the PayPal API base URL (tests). */
-  PAYPAL_API_BASE?: string
+  /** PayPlus (Israeli cards + Bit). All three are needed to enable online payments. */
+  PAYPLUS_API_KEY?: string
+  PAYPLUS_SECRET_KEY?: string
+  PAYPLUS_PAGE_UID?: string
+  /** 'production' or 'sandbox' (default). */
+  PAYPLUS_ENV?: string
+  /** Set to 'true' to ask PayPlus to issue an invoice/receipt automatically (needs the invoice module). */
+  PAYPLUS_INVOICES?: string
+  /** Optional override of the PayPlus API base URL (tests). */
+  PAYPLUS_API_BASE?: string
+  /** Resend API key + verified sender ("Name <mail@domain>") to email download links. Optional. */
+  RESEND_API_KEY?: string
+  MAIL_FROM?: string
 }
 
 export type AdminUser = { id: number; username: string }
