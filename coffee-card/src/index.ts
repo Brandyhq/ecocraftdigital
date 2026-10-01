@@ -1,7 +1,10 @@
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import { issueSession, pinMatches, sessionValid } from './auth.ts'
-import { STAMP_COOLDOWN_SECONDS, newToken, normalizePhone, rewardReady } from './logic.ts'
+import {
+  STAMP_COOLDOWN_SECONDS, birthdayAvailable, currentYear, newToken, normalizePhone,
+  parseBirthday, rewardReady, stampMultiplier, toCsv,
+} from './logic.ts'
 import { cardPage, joinPage, privacyPage, staffLoginPage, staffPage } from './pages.ts'
 
 type Env = {
@@ -10,15 +13,26 @@ type Env = {
     SHOP_NAME: string
     REWARD_TEXT: string
     STAMPS_NEEDED: string
+    DOUBLE_STAMP_DAYS: string
     STAFF_PIN: string
     SESSION_SECRET: string
   }
 }
-type Card = { id: number; token: string; name: string; phone: string; stamps: number; rewards_redeemed: number }
+type Card = {
+  id: number; token: string; name: string; phone: string; stamps: number; rewards_redeemed: number
+  birthday: string | null; birthday_reward_year: number | null; created_at: string; marketing_consent: number
+}
 
 const app = new Hono<Env>()
 const needed = (e: Env['Bindings']) => Math.max(1, Number(e.STAMPS_NEEDED) || 10)
-const publicCard = (c: Card) => ({ token: c.token, name: c.name, stamps: c.stamps })
+const publicCard = (c: Card, env: Env['Bindings']) => ({
+  token: c.token,
+  name: c.name,
+  stamps: c.stamps,
+  rewardReady: rewardReady(c.stamps, needed(env)),
+  birthdayGift: birthdayAvailable(c),
+  multiplier: stampMultiplier(env.DOUBLE_STAMP_DAYS ?? ''),
+})
 const getByToken = (db: D1Database, token: string) =>
   db.prepare('SELECT * FROM cards WHERE token = ?').bind(token).first<Card>()
 
@@ -41,10 +55,13 @@ app.post('/join', async (c) => {
   const page = (err: string) => c.html(joinPage(c.env.SHOP_NAME, c.env.REWARD_TEXT, needed(c.env), err), 400)
   if (!name) return page('נא למלא שם')
   if (!phone) return page('מספר טלפון לא תקין')
+  const bm = String(form.bmonth ?? ''), bd = String(form.bday ?? '')
+  const birthday = bm || bd ? parseBirthday(bm, bd) : null
+  if ((bm || bd) && !birthday) return page('יום ההולדת אינו תקין')
   const token = newToken()
   try {
-    await c.env.DB.prepare('INSERT INTO cards (token, name, phone, marketing_consent) VALUES (?, ?, ?, ?)')
-      .bind(token, name, phone, form.consent === '1' ? 1 : 0).run()
+    await c.env.DB.prepare('INSERT INTO cards (token, name, phone, marketing_consent, birthday) VALUES (?, ?, ?, ?, ?)')
+      .bind(token, name, phone, form.consent === '1' ? 1 : 0, birthday).run()
   } catch {
     return page('כבר קיים כרטיס למספר הזה. בקשי מהצוות לשלוח לך שוב את הקישור.')
   }
@@ -54,7 +71,7 @@ app.post('/join', async (c) => {
 app.get('/c/:token', async (c) => {
   const card = await getByToken(c.env.DB, c.req.param('token'))
   if (!card) return c.text('כרטיס לא נמצא', 404)
-  return c.html(cardPage(c.env.SHOP_NAME, c.env.REWARD_TEXT, needed(c.env), card))
+  return c.html(cardPage(c.env.SHOP_NAME, c.env.REWARD_TEXT, needed(c.env), publicCard(card, c.env)))
 })
 
 // --- staff auth ---
@@ -95,7 +112,7 @@ app.post('/api/staff/lookup', async (c) => {
     const p = normalizePhone(String(b.phone))
     if (p) card = await c.env.DB.prepare('SELECT * FROM cards WHERE phone = ?').bind(p).first<Card>()
   }
-  return card ? c.json({ card: publicCard(card) }) : c.json({ error: 'כרטיס לא נמצא' }, 404)
+  return card ? c.json({ card: publicCard(card, c.env) }) : c.json({ error: 'כרטיס לא נמצא' }, 404)
 })
 
 app.post('/api/staff/stamp', async (c) => {
@@ -110,12 +127,12 @@ app.post('/api/staff/stamp', async (c) => {
   const max = needed(c.env)
   const room = Math.max(0, max - card.stamps) // never exceed a full card; redeem first
   if (room === 0) return c.json({ error: 'הכרטיס מלא – יש לממש מתנה קודם' }, 409)
-  const add = Math.min(count, room)
+  const add = Math.min(count * stampMultiplier(c.env.DOUBLE_STAMP_DAYS ?? ''), room)
   await c.env.DB.batch([
     c.env.DB.prepare('UPDATE cards SET stamps = stamps + ? WHERE id = ?').bind(add, card.id),
     c.env.DB.prepare("INSERT INTO card_events (card_id, kind) VALUES (?, 'stamp')").bind(card.id),
   ])
-  return c.json({ card: publicCard({ ...card, stamps: card.stamps + add }) })
+  return c.json({ card: publicCard({ ...card, stamps: card.stamps + add }, c.env) })
 })
 
 app.post('/api/staff/redeem', async (c) => {
@@ -130,7 +147,35 @@ app.post('/api/staff/redeem', async (c) => {
   ).bind(max, card.id).run()
   if (!res.meta.changes) return c.json({ error: 'אין מספיק חותמות' }, 409)
   await c.env.DB.prepare("INSERT INTO card_events (card_id, kind) VALUES (?, 'redeem')").bind(card.id).run()
-  return c.json({ card: publicCard({ ...card, stamps: card.stamps - max }) })
+  return c.json({ card: publicCard({ ...card, stamps: card.stamps - max }, c.env) })
+})
+
+app.post('/api/staff/redeem-birthday', async (c) => {
+  const b = await c.req.json<{ token?: string }>().catch(() => ({} as { token?: string }))
+  const card = await getByToken(c.env.DB, String(b.token ?? ''))
+  if (!card) return c.json({ error: 'כרטיס לא נמצא' }, 404)
+  if (!birthdayAvailable(card)) return c.json({ error: 'אין מתנת יום הולדת זמינה' }, 409)
+  const year = currentYear()
+  // Guarded update: the gift can be given once per calendar year even under concurrent requests.
+  const res = await c.env.DB.prepare(
+    'UPDATE cards SET birthday_reward_year = ?1 WHERE id = ?2 AND (birthday_reward_year IS NULL OR birthday_reward_year <> ?1)',
+  ).bind(year, card.id).run()
+  if (!res.meta.changes) return c.json({ error: 'אין מתנת יום הולדת זמינה' }, 409)
+  await c.env.DB.prepare("INSERT INTO card_events (card_id, kind) VALUES (?, 'birthday')").bind(card.id).run()
+  return c.json({ card: publicCard({ ...card, birthday_reward_year: year }, c.env) })
+})
+
+app.get('/staff/export.csv', async (c) => {
+  if (!(await sessionValid(c.env.SESSION_SECRET, getCookie(c, 'staff')))) return c.redirect('/staff')
+  const { results } = await c.env.DB.prepare('SELECT * FROM cards ORDER BY created_at').all<Card>()
+  const csv = toCsv([
+    ['שם', 'טלפון', 'יום הולדת', 'חותמות', 'מתנות שמומשו', 'אישור שיווק', 'נרשם'],
+    ...results.map((r) => [r.name, r.phone, r.birthday, r.stamps, r.rewards_redeemed, r.marketing_consent ? 'כן' : 'לא', r.created_at]),
+  ])
+  return c.body(csv, 200, {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="customers.csv"',
+  })
 })
 
 export default app

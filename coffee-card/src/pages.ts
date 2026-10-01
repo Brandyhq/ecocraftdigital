@@ -27,18 +27,22 @@ export function joinPage(shop: string, reward: string, needed: number, err = '')
 <form class="panel" method="post" action="/join">
 <label for="n">שם</label><input id="n" name="name" type="text" required maxlength="60" autocomplete="name">
 <label for="p">טלפון</label><input id="p" name="phone" type="tel" required inputmode="tel" autocomplete="tel" placeholder="050-0000000">
+<label>יום הולדת (לא חובה – מתנה קטנה בחודש יום ההולדת)</label>
+<div style="display:flex;gap:8px"><select name="bday" aria-label="יום" style="flex:1;padding:12px;font-size:18px"><option value="">יום</option>${Array.from({ length: 31 }, (_, i) => `<option>${i + 1}</option>`).join('')}</select>
+<select name="bmonth" aria-label="חודש" style="flex:1;padding:12px;font-size:18px"><option value="">חודש</option>${Array.from({ length: 12 }, (_, i) => `<option>${i + 1}</option>`).join('')}</select></div>
 <label class="consent"><input type="checkbox" name="consent" value="1"><span>אני מאשר/ת קבלת הודעות ומבצעים (אפשר להסיר בכל עת)</span></label>
 <small>הפרטים נשמרים רק לצורך הכרטיס. <a href="/privacy">מדיניות פרטיות</a></small>
 ${err ? `<div class="msg err">${esc(err)}</div>` : ''}
 <button type="submit">קבלת כרטיס</button></form>${foot}`
 }
 
-export function cardPage(shop: string, reward: string, needed: number, c: { token: string; name: string; stamps: number }): string {
+export function cardPage(shop: string, reward: string, needed: number, c: { token: string; name: string; stamps: number; rewardReady: boolean; birthdayGift: boolean }): string {
   const cells = Array.from({ length: needed }, (_, i) => `<div class="s${i < c.stamps ? ' on' : ''}">${i < c.stamps ? '☕' : i + 1}</div>`).join('')
-  const ready = c.stamps >= needed
+  const ready = c.rewardReady
   return `${head(shop)}<div class="card"><h1>${esc(shop)}</h1><div>${esc(c.name)}</div>
 <div class="stamps">${cells}</div>
-<div>${ready ? `🎉 מגיע לך: ${esc(reward)}` : `עוד ${needed - c.stamps} חותמות ל${esc(reward)}`}</div></div>
+<div>${ready ? `🎉 מגיע לך: ${esc(reward)}` : `עוד ${needed - c.stamps} חותמות ל${esc(reward)}`}</div>
+${c.birthdayGift ? '<div style="margin-top:8px">🎂 מתנת יום הולדת מחכה לך – הציגי בקופה!</div>' : ''}</div>
 <div class="panel" style="text-align:center"><div id="qr" style="display:inline-block"></div>
 <p><small>מציגים את הקוד בקופה כדי לקבל חותמת</small></p>
 <button class="alt" id="save">שמירת הכרטיס במסך הבית</button></div>
@@ -65,9 +69,11 @@ export function staffPage(shop: string, needed: number): string {
 <label for="ph">או חיפוש לפי טלפון</label><input id="ph" type="tel" inputmode="tel">
 <button class="alt" id="find">חיפוש</button></div>
 <div class="panel" id="res" hidden>
-<h2 id="nm"></h2><div id="st"></div>
+<h2 id="nm"></h2><div id="st"></div><div id="flags" style="font-weight:700;margin-top:6px"></div>
 <label for="cnt">כמות קפה</label><input id="cnt" type="text" inputmode="numeric" value="1">
-<button id="stamp">חתימה</button><button class="alt" id="redeem">מימוש מתנה</button></div>
+<button id="stamp">חתימה</button><button class="alt" id="redeem">מימוש מתנה</button>
+<button class="alt" id="bday" hidden>🎂 מתנת יום הולדת</button></div>
+<p><a href="/staff/export.csv">ייצוא לקוחות (CSV)</a></p>
 <div class="msg" id="msg"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script>
@@ -76,13 +82,16 @@ const say=(t,ok)=>{$('msg').textContent=t;$('msg').className='msg '+(ok?'ok':'er
 async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
  if(r.status===401){location.href='/staff';return {}}return Object.assign({_s:r.status},await r.json())}
 function show(c){cur=c;$('res').hidden=false;$('nm').textContent=c.name;
- $('st').textContent=c.stamps+' / '+NEEDED+' חותמות'+(c.stamps>=NEEDED?' – 🎉 מגיעה מתנה':'');$('redeem').disabled=c.stamps<NEEDED}
+ $('st').textContent=c.stamps+' / '+NEEDED+' חותמות'+(c.stamps>=NEEDED?' – 🎉 מגיעה מתנה':'');$('redeem').disabled=!c.rewardReady;$('bday').hidden=!c.birthdayGift;
+ $('flags').textContent=[c.rewardReady?'🎉 מתנה ממתינה למימוש':'',c.birthdayGift?'🎂 מגיעה מתנת יום הולדת':'',c.multiplier>1?'✨ היום חותמת כפולה':''].filter(Boolean).join(' · ')}
 async function lookup(b){const r=await api('/api/staff/lookup',b);if(r.card){show(r.card);say('',true)}else say(r.error||'לא נמצא',false)}
 $('find').onclick=()=>lookup({phone:$('ph').value});
 $('stamp').onclick=async()=>{const r=await api('/api/staff/stamp',{token:cur.token,count:Number($('cnt').value)||1});
  if(r.card){show(r.card);say('נחתם ✔',true)}else say(r.error||'שגיאה',false)};
 $('redeem').onclick=async()=>{const r=await api('/api/staff/redeem',{token:cur.token});
  if(r.card){show(r.card);say('מתנה מומשה ✔',true)}else say(r.error||'שגיאה',false)};
+$('bday').onclick=async()=>{const r=await api('/api/staff/redeem-birthday',{token:cur.token});
+ if(r.card){show(r.card);say('מתנת יום הולדת ניתנה ✔',true)}else say(r.error||'שגיאה',false)};
 $('scan').onclick=async()=>{
  const v=$('v');try{v.srcObject=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});await v.play()}catch(e){return say('אין גישה למצלמה',false)}
  const c=document.createElement('canvas'),x=c.getContext('2d',{willReadFrequently:true});

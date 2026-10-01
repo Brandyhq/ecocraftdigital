@@ -6,7 +6,8 @@
   "vars": {
     "SHOP_NAME": "עגלת הקפה שלי",
     "REWARD_TEXT": "קפה במתנה ☕",
-    "STAMPS_NEEDED": "10"
+    "STAMPS_NEEDED": "10",
+    "DOUBLE_STAMP_DAYS": ""
   },
   "d1_databases": [
     {
