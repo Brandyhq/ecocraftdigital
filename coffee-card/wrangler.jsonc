@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "coffee-card",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-11-01",
+  "vars": {
+    "SHOP_NAME": "עגלת הקפה שלי",
+    "REWARD_TEXT": "קפה במתנה ☕",
+    "STAMPS_NEEDED": "10",
+    "DOUBLE_STAMP_DAYS": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "coffee-card",
+      "database_id": "808e397f-e4d0-410f-8734-003545d8c869"
+    }
+  ]
+}

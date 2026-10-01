@@ -1,0 +1,19 @@
+{
+  "name": "coffee-card",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc -p .",
+    "test": "tsc -p . && node --experimental-strip-types --test test/*.test.ts",
+    "db:migrate:local": "wrangler d1 migrations apply coffee-card --local",
+    "db:migrate:prod": "wrangler d1 migrations apply coffee-card --remote"
+  },
+  "dependencies": { "hono": "^4.10.4" },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260930.2",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.4.0"
+  }
+}
