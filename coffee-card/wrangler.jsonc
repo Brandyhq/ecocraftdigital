@@ -4,11 +4,14 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-11-01",
   "vars": {
-    "SHOP_NAME": "עגלת הקפה שלי",
+    "SHOP_NAME": "קופילה בית קלייה ומטבח",
     "REWARD_TEXT": "קפה במתנה ☕",
     "STAMPS_NEEDED": "10",
-    "DOUBLE_STAMP_DAYS": ""
+    "DOUBLE_STAMP_DAYS": "",
+    "CONTACT_PHONE": "0507148144",
+    "RETENTION_MONTHS": "24"
   },
+  "triggers": { "crons": ["0 3 1 * *"] },
   "d1_databases": [
     {
       "binding": "DB",
