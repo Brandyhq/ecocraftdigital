@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import { issueSession, pinMatches, sessionValid } from './auth.ts'
+import { purgeInactive } from './retention.ts'
 import {
   STAMP_COOLDOWN_SECONDS, birthdayAvailable, currentYear, newToken, normalizePhone,
   parseBirthday, rewardReady, stampMultiplier, toCsv,
@@ -14,6 +15,8 @@ type Env = {
     REWARD_TEXT: string
     STAMPS_NEEDED: string
     DOUBLE_STAMP_DAYS: string
+    CONTACT_PHONE: string
+    RETENTION_MONTHS: string
     STAFF_PIN: string
     SESSION_SECRET: string
   }
@@ -24,6 +27,7 @@ type Card = {
 }
 
 const app = new Hono<Env>()
+const retentionMonths = (e: Env['Bindings']) => Math.max(1, Number(e.RETENTION_MONTHS) || 24)
 const needed = (e: Env['Bindings']) => Math.max(1, Number(e.STAMPS_NEEDED) || 10)
 const publicCard = (c: Card, env: Env['Bindings']) => ({
   token: c.token,
@@ -46,7 +50,7 @@ app.use('*', async (c, next) => {
 // --- customer ---
 app.get('/', (c) => c.redirect('/join'))
 app.get('/join', (c) => c.html(joinPage(c.env.SHOP_NAME, c.env.REWARD_TEXT, needed(c.env))))
-app.get('/privacy', (c) => c.html(privacyPage(c.env.SHOP_NAME)))
+app.get('/privacy', (c) => c.html(privacyPage(c.env.SHOP_NAME, c.env.CONTACT_PHONE, retentionMonths(c.env))))
 
 app.post('/join', async (c) => {
   const form = await c.req.parseBody()
@@ -178,4 +182,10 @@ app.get('/staff/export.csv', async (c) => {
   })
 })
 
-export default app
+export default {
+  fetch: app.fetch,
+  // Monthly cron: delete cards inactive for RETENTION_MONTHS (matches /privacy).
+  async scheduled(_event: ScheduledEvent, env: Env['Bindings'], ctx: ExecutionContext) {
+    ctx.waitUntil(purgeInactive(env.DB, retentionMonths(env)))
+  },
+}
