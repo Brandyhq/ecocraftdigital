@@ -4,7 +4,7 @@ import { issueSession, pinMatches, sessionValid } from './auth.ts'
 import { purgeInactive } from './retention.ts'
 import {
   STAMP_COOLDOWN_SECONDS, birthdayAvailable, currentYear, newToken, normalizePhone,
-  parseBirthday, rewardReady, stampMultiplier, toCsv,
+  parseBirthday, rewardReady, stampMultiplier, toCsv, formatPhone, formatIsraelTime, EVENT_LABELS,
 } from './logic.ts'
 import { cardPage, joinPage, privacyPage, staffLoginPage, staffPage } from './pages.ts'
 
@@ -169,17 +169,41 @@ app.post('/api/staff/redeem-birthday', async (c) => {
   return c.json({ card: publicCard({ ...card, birthday_reward_year: year }, c.env) })
 })
 
+const csvResponse = (c: any, csv: string, filename: string) =>
+  c.body(csv, 200, {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': `attachment; filename="${filename}"`,
+  })
+
+// ?marketing=1 limits the export to customers who agreed to receive messages.
 app.get('/staff/export.csv', async (c) => {
   if (!(await sessionValid(c.env.SESSION_SECRET, getCookie(c, 'staff')))) return c.redirect('/staff')
-  const { results } = await c.env.DB.prepare('SELECT * FROM cards ORDER BY created_at').all<Card>()
+  const marketing = c.req.query('marketing') === '1'
+  const { results } = await c.env.DB.prepare(
+    `SELECT * FROM cards ${marketing ? 'WHERE marketing_consent = 1' : ''} ORDER BY created_at`,
+  ).all<Card>()
   const csv = toCsv([
     ['שם', 'טלפון', 'יום הולדת', 'חותמות', 'מתנות שמומשו', 'אישור שיווק', 'נרשם'],
-    ...results.map((r) => [r.name, r.phone, r.birthday, r.stamps, r.rewards_redeemed, r.marketing_consent ? 'כן' : 'לא', r.created_at]),
+    ...results.map((r) => [
+      r.name, formatPhone(r.phone), r.birthday, r.stamps, r.rewards_redeemed,
+      r.marketing_consent ? 'כן' : 'לא', formatIsraelTime(r.created_at),
+    ]),
   ])
-  return c.body(csv, 200, {
-    'Content-Type': 'text/csv; charset=utf-8',
-    'Content-Disposition': 'attachment; filename="customers.csv"',
-  })
+  return csvResponse(c, csv, marketing ? 'customers-marketing.csv' : 'customers.csv')
+})
+
+// Every stamp, redemption and birthday gift, in Israel time. Capped so a huge history cannot exhaust the Worker.
+app.get('/staff/export-events.csv', async (c) => {
+  if (!(await sessionValid(c.env.SESSION_SECRET, getCookie(c, 'staff')))) return c.redirect('/staff')
+  const { results } = await c.env.DB.prepare(
+    `SELECT e.created_at, e.kind, c.name, c.phone FROM card_events e JOIN cards c ON c.id = e.card_id
+     ORDER BY e.created_at, e.id LIMIT 50000`,
+  ).all<{ created_at: string; kind: string; name: string; phone: string }>()
+  const csv = toCsv([
+    ['תאריך ושעה', 'שם', 'טלפון', 'פעולה'],
+    ...results.map((r) => [formatIsraelTime(r.created_at), r.name, formatPhone(r.phone), EVENT_LABELS[r.kind] ?? r.kind]),
+  ])
+  return csvResponse(c, csv, 'stamp-history.csv')
 })
 
 export default {
