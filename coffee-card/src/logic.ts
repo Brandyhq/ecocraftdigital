@@ -72,3 +72,24 @@ export function csvCell(v: string | number | null): string {
 export function toCsv(rows: (string | number | null)[][]): string {
   return '﻿' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n') + '\r\n' // BOM so Excel reads Hebrew
 }
+
+/** 0541234567 -> 054-1234567, 021234567 -> 02-1234567. The dash keeps Excel from dropping the leading zero. */
+export function formatPhone(phone: string): string {
+  const d = phone.replace(/\D/g, '')
+  const area = d.length === 10 ? 3 : 2
+  return /^0\d{8,9}$/.test(d) ? `${d.slice(0, area)}-${d.slice(area)}` : phone
+}
+
+/** SQLite UTC timestamp ("2026-10-08 09:31:00") -> Israel time ("2026-10-08 12:31"). */
+export function formatIsraelTime(sqlUtc: string): string {
+  const ms = Date.parse(sqlUtc.replace(' ', 'T') + 'Z')
+  if (Number.isNaN(ms)) return sqlUtc
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).formatToParts(new Date(ms)).map((x) => [x.type, x.value]),
+  )
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`
+}
+
+export const EVENT_LABELS: Record<string, string> = { stamp: 'חתימה', redeem: 'מימוש מתנה', birthday: 'מתנת יום הולדת' }

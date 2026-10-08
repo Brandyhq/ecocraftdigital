@@ -73,7 +73,7 @@ export function staffPage(shop: string, needed: number): string {
 <label for="cnt">כמות קפה</label><input id="cnt" type="text" inputmode="numeric" value="1">
 <button id="stamp">חתימה</button><button class="alt" id="redeem">מימוש מתנה</button>
 <button class="alt" id="bday" hidden>🎂 מתנת יום הולדת</button></div>
-<p><a href="/staff/export.csv">ייצוא לקוחות (CSV)</a></p>
+<p>ייצוא (CSV):<br><a href="/staff/export.csv">כל הלקוחות</a> · <a href="/staff/export.csv?marketing=1">רק מי שאישרו שיווק</a> · <a href="/staff/export-events.csv">היסטוריית חתימות</a></p>
 <div class="msg" id="msg"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script>

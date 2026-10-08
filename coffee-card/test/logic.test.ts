@@ -54,3 +54,17 @@ test('csv escapes quotes and formulas', () => {
   assert.equal(csvCell(null), '')
   assert.ok(toCsv([['שם']]).startsWith('﻿'))
 })
+
+import { formatIsraelTime, formatPhone } from '../src/logic.ts'
+
+test('formatPhone keeps the leading zero visible to Excel', () => {
+  assert.equal(formatPhone('0541234567'), '054-1234567')
+  assert.equal(formatPhone('021234567'), '02-1234567')
+  assert.equal(formatPhone('abc'), 'abc')
+})
+test('formatIsraelTime converts UTC to Israel time, summer and winter', () => {
+  assert.equal(formatIsraelTime('2026-10-08 09:31:00'), '2026-10-08 12:31') // IDT, UTC+3
+  assert.equal(formatIsraelTime('2026-01-15 09:31:00'), '2026-01-15 11:31') // IST, UTC+2
+  assert.equal(formatIsraelTime('2026-10-08 22:30:00'), '2026-10-09 01:30') // crosses midnight
+  assert.equal(formatIsraelTime('garbage'), 'garbage')
+})
