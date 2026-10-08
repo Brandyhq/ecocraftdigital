@@ -92,13 +92,25 @@ $('redeem').onclick=async()=>{const r=await api('/api/staff/redeem',{token:cur.t
  if(r.card){show(r.card);say('מתנה מומשה ✔',true)}else say(r.error||'שגיאה',false)};
 $('bday').onclick=async()=>{const r=await api('/api/staff/redeem-birthday',{token:cur.token});
  if(r.card){show(r.card);say('מתנת יום הולדת ניתנה ✔',true)}else say(r.error||'שגיאה',false)};
+let scanning=false,stream=null;
+const stopCam=()=>{scanning=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('v').srcObject=null};
+addEventListener('pagehide',stopCam);
 $('scan').onclick=async()=>{
- const v=$('v');try{v.srcObject=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});await v.play()}catch(e){return say('אין גישה למצלמה',false)}
- const c=document.createElement('canvas'),x=c.getContext('2d',{willReadFrequently:true});
- (function tick(){if(v.readyState===v.HAVE_ENOUGH_DATA){c.width=v.videoWidth;c.height=v.videoHeight;x.drawImage(v,0,0);
-  const d=x.getImageData(0,0,c.width,c.height),q=jsQR(d.data,d.width,d.height);
-  if(q&&/^[0-9a-f]{32}$/.test(q.data)){v.srcObject.getTracks().forEach(t=>t.stop());return lookup({token:q.data})}}
-  requestAnimationFrame(tick)})()};
+ if(scanning)return;
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return say('הדפדפן לא תומך במצלמה. אפשר לחפש לפי טלפון',false);
+ const v=$('v');
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});v.srcObject=stream;await v.play()}
+ catch(e){stopCam();return say(e&&e.name==='NotAllowedError'?'אין הרשאה למצלמה. יש לאשר בהגדרות הדפדפן, או לחפש לפי טלפון':'לא נמצאה מצלמה. אפשר לחפש לפי טלפון',false)}
+ scanning=true;say('סורקת...',true);
+ const c=document.createElement('canvas'),x=c.getContext('2d',{willReadFrequently:true});let last=0,hinted=false;
+ (function tick(t){
+  if(!scanning)return;
+  if(t-last>=100&&v.readyState===v.HAVE_ENOUGH_DATA&&v.videoWidth){last=t;
+   const k=Math.min(1,640/v.videoWidth);c.width=Math.round(v.videoWidth*k);c.height=Math.round(v.videoHeight*k);x.drawImage(v,0,0,c.width,c.height);
+   const d=x.getImageData(0,0,c.width,c.height),q=jsQR(d.data,d.width,d.height);
+   if(q){if(/^[0-9a-f]{32}$/.test(q.data)){stopCam();return lookup({token:q.data})}
+    if(!hinted){hinted=true;say('זה לא קוד של כרטיס לקוח',false)}}}
+  requestAnimationFrame(tick)})(0)};
 </script>${foot}`
 }
 
