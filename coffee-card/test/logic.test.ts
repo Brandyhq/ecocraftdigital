@@ -92,3 +92,14 @@ test('whatsappLink builds an international wa.me link with the message', () => {
   assert.equal(whatsappLink('021234567', 'x'), 'https://wa.me/97221234567?text=x')
   assert.equal(whatsappLink('garbage', 'x'), null)
 })
+
+import { qrSvg } from '../src/qr.ts'
+
+test('qrSvg: 25x25 alphanumeric QR with a full quiet zone and its own white background', () => {
+  const svg = qrSvg('0123456789abcdef0123456789abcdef', 'קוד')
+  assert.ok(svg.startsWith('<svg'))
+  assert.ok(svg.includes('viewBox="0 0 33 33"')) // 25 modules + 4 quiet-zone modules on each side
+  assert.ok(svg.includes('<rect width="33" height="33" fill="#fff"/>'))
+  assert.ok(svg.includes('aria-label="קוד"'))
+  assert.notEqual(qrSvg('0123456789abcdef0123456789abcdef', 'x'), qrSvg('fedcba9876543210fedcba9876543210', 'x'))
+})

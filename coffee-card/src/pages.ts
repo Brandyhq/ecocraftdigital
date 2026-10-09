@@ -1,4 +1,5 @@
 import { esc } from './logic.ts'
+import { qrSvg } from './qr.ts'
 
 const head = (title: string, color = '#537c6d', extra = '') => `<!doctype html><html lang="he" dir="rtl"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -7,6 +8,7 @@ const head = (title: string, color = '#537c6d', extra = '') => `<!doctype html><
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:#f6f1ea;color:#2a2523}
 main{max-width:420px;margin:0 auto;padding:20px 16px}h1{margin:.2em 0}
 .card{background:${color};color:#fff;border-radius:20px;padding:20px;box-shadow:0 6px 20px #0003}
+.qrbox{width:min(100%,340px);margin:0 auto;cursor:zoom-in;border-radius:12px;overflow:hidden}.qrbox svg{display:block;width:100%;height:auto}.qrbox.full{position:fixed;inset:0;z-index:10;width:auto;margin:0;border-radius:0;background:#fff;display:grid;place-items:center;cursor:zoom-out}.qrbox.full svg{width:min(96vw,96vh);height:auto}
 .card.c{text-align:center}.logo{display:block;width:max-content;margin:0 auto 14px;background:#fff;border-radius:24px;padding:10px}.logo img{display:block;width:130px;height:auto}
 .panel{background:#fff;border-radius:16px;padding:16px;margin-top:16px;box-shadow:0 2px 8px #0001}
 label{display:block;margin:12px 0 4px;font-weight:600}
@@ -55,13 +57,14 @@ export function cardPage(shop: string, reward: string, needed: number, c: { toke
 <div class="stamps">${cells}</div>
 <div>${ready ? `🎉 מגיע לך: ${esc(reward)}` : `עוד ${needed - c.stamps} חותמות ל${esc(reward)}`}</div>
 ${c.birthdayGift ? '<div style="margin-top:8px">🎂 מתנת יום הולדת מחכה לך – הציגי בקופה!</div>' : ''}</div>
-<div class="panel" style="text-align:center"><div id="qr" style="display:inline-block"></div>
-<p><small>מציגים את הקוד בקופה כדי לקבל חותמת</small></p>
+<div class="panel" style="text-align:center"><div id="qrbox" class="qrbox" role="button" tabindex="0" aria-label="הגדלת הקוד">${qrSvg(c.token, 'קוד הכרטיס')}</div>
+<p><small>מציגים את הקוד בקופה כדי לקבל חותמת. לחיצה על הקוד מגדילה אותו, ועדיף להעלות את בהירות המסך.</small></p>
 <button class="alt" id="save">שמירת הכרטיס במסך הבית</button>
 <p><small><a href="/join?new=1">הרשמה של לקוח אחר מהמכשיר הזה</a></small></p></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-new QRCode(document.getElementById('qr'),{text:${JSON.stringify(c.token)},width:220,height:220});
+const qb=document.getElementById('qrbox');
+const tog=()=>{qb.classList.toggle('full');try{if(qb.classList.contains('full')&&navigator.wakeLock)navigator.wakeLock.request('screen').catch(()=>{})}catch(e){}};
+qb.onclick=tog;qb.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tog()}};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)location.reload()});
 try{localStorage.setItem('cardToken',${JSON.stringify(c.token)})}catch(e){}
 document.getElementById('save').onclick=()=>alert('באייפון: שיתוף ← הוספה למסך הבית. באנדרואיד: תפריט ← התקנת אפליקציה או הוספה למסך הבית. יופיע אייקון של העסק, והכרטיס ייפתח ישר.');
@@ -89,7 +92,7 @@ export function staffPage(shop: string, needed: number): string {
 <a class="alt" id="wa" hidden target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;padding:14px;border-radius:12px;border:2px solid #537c6d;color:#537c6d;font-weight:700;margin-top:12px">שליחת קישור הכרטיס בוואטסאפ</a></div>
 <p>ייצוא (CSV):<br><a href="/staff/export.csv">כל הלקוחות</a> · <a href="/staff/export.csv?marketing=1">רק מי שאישרו שיווק</a> · <a href="/staff/export-events.csv">היסטוריית חתימות</a></p>
 <div class="msg" id="msg"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="/jsQR.js"></script>
 <script>
 const NEEDED=${needed};let cur=null;const $=id=>document.getElementById(id);
 const say=(t,ok)=>{$('msg').textContent=t;$('msg').className='msg '+(ok?'ok':'err')};
@@ -108,22 +111,30 @@ $('redeem').onclick=async()=>{const r=await api('/api/staff/redeem',{token:cur.t
 $('bday').onclick=async()=>{const r=await api('/api/staff/redeem-birthday',{token:cur.token});
  if(r.card){show(r.card);say('מתנת יום הולדת ניתנה ✔',true)}else say(r.error||'שגיאה',false)};
 let scanning=false,stream=null;
+const TOKEN=/^[0-9a-f]{32}$/i;
+let det=null;try{if('BarcodeDetector' in window)det=new BarcodeDetector({formats:['qr_code']})}catch(e){}
 const stopCam=()=>{scanning=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('v').srcObject=null};
 addEventListener('pagehide',stopCam);
 $('scan').onclick=async()=>{
  if(scanning)return;
  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return say('הדפדפן לא תומך במצלמה. אפשר לחפש לפי טלפון',false);
+ if(!det&&!window.jsQR)return say('הסריקה לא זמינה בדפדפן הזה. אפשר לחפש לפי טלפון',false);
  const v=$('v');
- try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});v.srcObject=stream;await v.play()}
+ try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}});v.srcObject=stream;await v.play()}
  catch(e){stopCam();return say(e&&e.name==='NotAllowedError'?'אין הרשאה למצלמה. יש לאשר בהגדרות הדפדפן, או לחפש לפי טלפון':'לא נמצאה מצלמה. אפשר לחפש לפי טלפון',false)}
- scanning=true;say('סורקת...',true);
- const c=document.createElement('canvas'),x=c.getContext('2d',{willReadFrequently:true});let last=0,hinted=false;
- (function tick(t){
+ scanning=true;say('סורקת... קרבי את המצלמה לקוד, ובקשי מהלקוח להעלות את בהירות המסך',true);
+ const c=document.createElement('canvas'),x=c.getContext('2d',{willReadFrequently:true});let last=0,hinted=false,n=0;
+ (async function tick(t){
   if(!scanning)return;
-  if(t-last>=100&&v.readyState===v.HAVE_ENOUGH_DATA&&v.videoWidth){last=t;
-   const k=Math.min(1,640/v.videoWidth);c.width=Math.round(v.videoWidth*k);c.height=Math.round(v.videoHeight*k);x.drawImage(v,0,0,c.width,c.height);
-   const d=x.getImageData(0,0,c.width,c.height),q=jsQR(d.data,d.width,d.height);
-   if(q){if(/^[0-9a-f]{32}$/.test(q.data)){stopCam();return lookup({token:q.data})}
+  if(t-last>=120&&v.readyState===v.HAVE_ENOUGH_DATA&&v.videoWidth){last=t;let val=null;
+   try{
+    if(det){const r=await det.detect(v);if(r.length)val=r[0].rawValue}
+    if(val===null&&window.jsQR){const k=Math.min(1,((n++%2)?640:960)/v.videoWidth);
+     c.width=Math.round(v.videoWidth*k);c.height=Math.round(v.videoHeight*k);x.drawImage(v,0,0,c.width,c.height);
+     const d=x.getImageData(0,0,c.width,c.height),q=jsQR(d.data,d.width,d.height);if(q)val=q.data}
+   }catch(e){}
+   if(!scanning)return;
+   if(val!==null){if(TOKEN.test(val)){stopCam();return lookup({token:val.toLowerCase()})}
     if(!hinted){hinted=true;say('זה לא קוד של כרטיס לקוח',false)}}}
   requestAnimationFrame(tick)})(0)};
 </script>${foot}`

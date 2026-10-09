@@ -10,7 +10,11 @@
     "db:migrate:local": "wrangler d1 migrations apply coffee-card --local",
     "db:migrate:prod": "wrangler d1 migrations apply coffee-card --remote"
   },
-  "dependencies": { "hono": "^4.10.4" },
+  "dependencies": {
+    "hono": "^4.10.4",
+    "jsqr": "^1.4.0",
+    "qrcode-generator": "^2.0.4"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260930.2",
     "typescript": "^5.9.0",
