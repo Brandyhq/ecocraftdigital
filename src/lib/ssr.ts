@@ -192,6 +192,7 @@ export function page(o: Page) {
 <title>${e(o.title)}</title>
 <meta name="description" content="${e(o.description)}">
 <link rel="canonical" href="${e(url)}">
+<meta name="p:domain_verify" content="e4e83f1361232ae95f154eff6ac513f1"/>
 ${o.noindex ? '<meta name="robots" content="noindex,follow">' : '<meta name="robots" content="index,follow,max-image-preview:large">'}
 <meta property="og:type" content="${o.ogType || 'website'}"><meta property="og:site_name" content="${e(d.brandName)}"><meta property="og:locale" content="he_IL">
 <meta property="og:title" content="${e(o.title)}"><meta property="og:description" content="${e(o.description)}"><meta property="og:url" content="${e(url)}">
