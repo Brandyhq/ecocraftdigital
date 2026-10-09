@@ -7,6 +7,7 @@ const head = (title: string, color = '#537c6d', extra = '') => `<!doctype html><
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:#f6f1ea;color:#2a2523}
 main{max-width:420px;margin:0 auto;padding:20px 16px}h1{margin:.2em 0}
 .card{background:${color};color:#fff;border-radius:20px;padding:20px;box-shadow:0 6px 20px #0003}
+.card.c{text-align:center}.logo{display:block;width:max-content;margin:0 auto 14px;background:#fff;border-radius:24px;padding:10px}.logo img{display:block;width:130px;height:auto}
 .panel{background:#fff;border-radius:16px;padding:16px;margin-top:16px;box-shadow:0 2px 8px #0001}
 label{display:block;margin:12px 0 4px;font-weight:600}
 input[type=text],input[type=tel],input[type=password]{width:100%;padding:12px;font-size:18px;border:1px solid #bbb;border-radius:10px}
@@ -50,7 +51,7 @@ const cardHeadTags = (shop: string, token: string) =>
 export function cardPage(shop: string, reward: string, needed: number, c: { token: string; name: string; stamps: number; rewardReady: boolean; birthdayGift: boolean }): string {
   const cells = Array.from({ length: needed }, (_, i) => `<div class="s${i < c.stamps ? ' on' : ''}">${i < c.stamps ? '☕' : i + 1}</div>`).join('')
   const ready = c.rewardReady
-  return `${head(shop, undefined, cardHeadTags(shop, c.token))}<div class="card"><h1>${esc(shop)}</h1><div>${esc(c.name)}</div>
+  return `${head(shop, undefined, cardHeadTags(shop, c.token))}<div class="card c"><span class="logo"><img src="/logo.png" alt="${esc(shop)}" width="130" height="129"></span><div>${esc(c.name)}</div>
 <div class="stamps">${cells}</div>
 <div>${ready ? `🎉 מגיע לך: ${esc(reward)}` : `עוד ${needed - c.stamps} חותמות ל${esc(reward)}`}</div>
 ${c.birthdayGift ? '<div style="margin-top:8px">🎂 מתנת יום הולדת מחכה לך – הציגי בקופה!</div>' : ''}</div>
