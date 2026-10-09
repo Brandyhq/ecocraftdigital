@@ -117,3 +117,10 @@ export function buildManifest(shop: string, token: string) {
     ],
   }
 }
+
+/** wa.me link that opens WhatsApp to this Israeli number with a ready message. */
+export function whatsappLink(phone: string, text: string): string | null {
+  const d = phone.replace(/\D/g, '')
+  if (!/^0\d{8,9}$/.test(d)) return null
+  return `https://wa.me/972${d.slice(1)}?text=${encodeURIComponent(text)}`
+}

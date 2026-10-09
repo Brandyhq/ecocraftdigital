@@ -33,7 +33,13 @@ export function joinPage(shop: string, reward: string, needed: number, err = '')
 <label class="consent"><input type="checkbox" name="consent" value="1"><span>אני מאשר/ת קבלת הודעות ומבצעים (אפשר להסיר בכל עת)</span></label>
 <small>הפרטים נשמרים רק לצורך הכרטיס. <a href="/privacy">מדיניות פרטיות</a></small>
 ${err ? `<div class="msg err">${esc(err)}</div>` : ''}
-<button type="submit">קבלת כרטיס</button></form>${foot}`
+<button type="submit">קבלת כרטיס</button></form>
+<script>
+(async()=>{try{if(location.search.indexOf('new=1')>=0)return;const t=localStorage.getItem('cardToken');
+ if(!t||!/^[0-9a-f]{32}$/.test(t))return;
+ const r=await fetch('/c/'+t+'/manifest.webmanifest');
+ if(r.ok)location.replace('/c/'+t);else localStorage.removeItem('cardToken')}catch(e){}})();
+</script>${foot}`
 }
 
 const cardHeadTags = (shop: string, token: string) =>
@@ -50,7 +56,8 @@ export function cardPage(shop: string, reward: string, needed: number, c: { toke
 ${c.birthdayGift ? '<div style="margin-top:8px">🎂 מתנת יום הולדת מחכה לך – הציגי בקופה!</div>' : ''}</div>
 <div class="panel" style="text-align:center"><div id="qr" style="display:inline-block"></div>
 <p><small>מציגים את הקוד בקופה כדי לקבל חותמת</small></p>
-<button class="alt" id="save">שמירת הכרטיס במסך הבית</button></div>
+<button class="alt" id="save">שמירת הכרטיס במסך הבית</button>
+<p><small><a href="/join?new=1">הרשמה של לקוח אחר מהמכשיר הזה</a></small></p></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 new QRCode(document.getElementById('qr'),{text:${JSON.stringify(c.token)},width:220,height:220});
@@ -77,7 +84,8 @@ export function staffPage(shop: string, needed: number): string {
 <h2 id="nm"></h2><div id="st"></div><div id="flags" style="font-weight:700;margin-top:6px"></div>
 <label for="cnt">כמות קפה</label><input id="cnt" type="text" inputmode="numeric" value="1">
 <button id="stamp">חתימה</button><button class="alt" id="redeem">מימוש מתנה</button>
-<button class="alt" id="bday" hidden>🎂 מתנת יום הולדת</button></div>
+<button class="alt" id="bday" hidden>🎂 מתנת יום הולדת</button>
+<a class="alt" id="wa" hidden target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;padding:14px;border-radius:12px;border:2px solid #537c6d;color:#537c6d;font-weight:700;margin-top:12px">שליחת קישור הכרטיס בוואטסאפ</a></div>
 <p>ייצוא (CSV):<br><a href="/staff/export.csv">כל הלקוחות</a> · <a href="/staff/export.csv?marketing=1">רק מי שאישרו שיווק</a> · <a href="/staff/export-events.csv">היסטוריית חתימות</a></p>
 <div class="msg" id="msg"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
@@ -88,6 +96,7 @@ async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'
  if(r.status===401){location.href='/staff';return {}}return Object.assign({_s:r.status},await r.json())}
 function show(c){cur=c;$('res').hidden=false;$('nm').textContent=c.name;
  $('st').textContent=c.stamps+' / '+NEEDED+' חותמות'+(c.stamps>=NEEDED?' – 🎉 מגיעה מתנה':'');$('redeem').disabled=!c.rewardReady;$('bday').hidden=!c.birthdayGift;
+ $('wa').hidden=!c.whatsappUrl;if(c.whatsappUrl)$('wa').href=c.whatsappUrl;
  $('flags').textContent=[c.rewardReady?'🎉 מתנה ממתינה למימוש':'',c.birthdayGift?'🎂 מגיעה מתנת יום הולדת':'',c.multiplier>1?'✨ היום חותמת כפולה':''].filter(Boolean).join(' · ')}
 async function lookup(b){const r=await api('/api/staff/lookup',b);if(r.card){show(r.card);say('',true)}else say(r.error||'לא נמצא',false)}
 $('find').onclick=()=>lookup({phone:$('ph').value});

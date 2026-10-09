@@ -82,3 +82,13 @@ test('buildManifest points at the card itself and nothing else', () => {
   assert.ok(m.icons.some((i) => i.sizes === '192x192') && m.icons.some((i) => i.purpose === 'maskable'))
   assert.equal(buildManifest('קפה', 't').short_name, 'קפה')
 })
+
+import { whatsappLink } from '../src/logic.ts'
+
+test('whatsappLink builds an international wa.me link with the message', () => {
+  const u = whatsappLink('0541234567', 'שלום: https://x/c/abc')
+  assert.ok(u!.startsWith('https://wa.me/972541234567?text='))
+  assert.equal(decodeURIComponent(u!.split('?text=')[1]), 'שלום: https://x/c/abc')
+  assert.equal(whatsappLink('021234567', 'x'), 'https://wa.me/97221234567?text=x')
+  assert.equal(whatsappLink('garbage', 'x'), null)
+})
