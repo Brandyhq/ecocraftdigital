@@ -4,7 +4,7 @@ import { issueSession, pinMatches, sessionValid } from './auth.ts'
 import { purgeInactive } from './retention.ts'
 import {
   STAMP_COOLDOWN_SECONDS, birthdayAvailable, currentYear, newToken, normalizePhone,
-  parseBirthday, rewardReady, stampMultiplier, toCsv, formatPhone, formatIsraelTime, EVENT_LABELS, buildManifest,
+  parseBirthday, rewardReady, stampMultiplier, toCsv, formatPhone, formatIsraelTime, EVENT_LABELS, buildManifest, whatsappLink,
 } from './logic.ts'
 import { cardPage, joinPage, privacyPage, staffLoginPage, staffPage } from './pages.ts'
 
@@ -37,6 +37,15 @@ const publicCard = (c: Card, env: Env['Bindings']) => ({
   birthdayGift: birthdayAvailable(c),
   multiplier: stampMultiplier(env.DOUBLE_STAMP_DAYS ?? ''),
 })
+// Staff-only view of a card: adds the customer's private card link and a ready WhatsApp message with it.
+const staffCard = (card: Card, c: { req: { url: string }; env: Env['Bindings'] }) => {
+  const cardUrl = `${new URL(c.req.url).origin}/c/${card.token}`
+  return {
+    ...publicCard(card, c.env),
+    cardUrl,
+    whatsappUrl: whatsappLink(card.phone, `הכרטיס שלך ב${c.env.SHOP_NAME}: ${cardUrl}`),
+  }
+}
 const getByToken = (db: D1Database, token: string) =>
   db.prepare('SELECT * FROM cards WHERE token = ?').bind(token).first<Card>()
 
@@ -124,7 +133,7 @@ app.post('/api/staff/lookup', async (c) => {
     const p = normalizePhone(String(b.phone))
     if (p) card = await c.env.DB.prepare('SELECT * FROM cards WHERE phone = ?').bind(p).first<Card>()
   }
-  return card ? c.json({ card: publicCard(card, c.env) }) : c.json({ error: 'כרטיס לא נמצא' }, 404)
+  return card ? c.json({ card: staffCard(card, c) }) : c.json({ error: 'כרטיס לא נמצא' }, 404)
 })
 
 app.post('/api/staff/stamp', async (c) => {
@@ -144,7 +153,7 @@ app.post('/api/staff/stamp', async (c) => {
     c.env.DB.prepare('UPDATE cards SET stamps = stamps + ? WHERE id = ?').bind(add, card.id),
     c.env.DB.prepare("INSERT INTO card_events (card_id, kind) VALUES (?, 'stamp')").bind(card.id),
   ])
-  return c.json({ card: publicCard({ ...card, stamps: card.stamps + add }, c.env) })
+  return c.json({ card: staffCard({ ...card, stamps: card.stamps + add }, c) })
 })
 
 app.post('/api/staff/redeem', async (c) => {
@@ -159,7 +168,7 @@ app.post('/api/staff/redeem', async (c) => {
   ).bind(max, card.id).run()
   if (!res.meta.changes) return c.json({ error: 'אין מספיק חותמות' }, 409)
   await c.env.DB.prepare("INSERT INTO card_events (card_id, kind) VALUES (?, 'redeem')").bind(card.id).run()
-  return c.json({ card: publicCard({ ...card, stamps: card.stamps - max }, c.env) })
+  return c.json({ card: staffCard({ ...card, stamps: card.stamps - max }, c) })
 })
 
 app.post('/api/staff/redeem-birthday', async (c) => {
@@ -174,7 +183,7 @@ app.post('/api/staff/redeem-birthday', async (c) => {
   ).bind(year, card.id).run()
   if (!res.meta.changes) return c.json({ error: 'אין מתנת יום הולדת זמינה' }, 409)
   await c.env.DB.prepare("INSERT INTO card_events (card_id, kind) VALUES (?, 'birthday')").bind(card.id).run()
-  return c.json({ card: publicCard({ ...card, birthday_reward_year: year }, c.env) })
+  return c.json({ card: staffCard({ ...card, birthday_reward_year: year }, c) })
 })
 
 const csvResponse = (c: any, csv: string, filename: string) =>
