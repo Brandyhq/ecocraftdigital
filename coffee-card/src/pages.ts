@@ -1,8 +1,8 @@
 import { esc } from './logic.ts'
 
-const head = (title: string, color = '#537c6d') => `<!doctype html><html lang="he" dir="rtl"><head>
+const head = (title: string, color = '#537c6d', extra = '') => `<!doctype html><html lang="he" dir="rtl"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="${color}"><title>${esc(title)}</title>
+<meta name="theme-color" content="${color}">${extra}<title>${esc(title)}</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:#f6f1ea;color:#2a2523}
 main{max-width:420px;margin:0 auto;padding:20px 16px}h1{margin:.2em 0}
@@ -36,10 +36,15 @@ ${err ? `<div class="msg err">${esc(err)}</div>` : ''}
 <button type="submit">קבלת כרטיס</button></form>${foot}`
 }
 
+const cardHeadTags = (shop: string, token: string) =>
+  `<link rel="manifest" href="/c/${token}/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png">` +
+  `<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">` +
+  `<meta name="apple-mobile-web-app-title" content="${esc(shop)}">`
+
 export function cardPage(shop: string, reward: string, needed: number, c: { token: string; name: string; stamps: number; rewardReady: boolean; birthdayGift: boolean }): string {
   const cells = Array.from({ length: needed }, (_, i) => `<div class="s${i < c.stamps ? ' on' : ''}">${i < c.stamps ? '☕' : i + 1}</div>`).join('')
   const ready = c.rewardReady
-  return `${head(shop)}<div class="card"><h1>${esc(shop)}</h1><div>${esc(c.name)}</div>
+  return `${head(shop, undefined, cardHeadTags(shop, c.token))}<div class="card"><h1>${esc(shop)}</h1><div>${esc(c.name)}</div>
 <div class="stamps">${cells}</div>
 <div>${ready ? `🎉 מגיע לך: ${esc(reward)}` : `עוד ${needed - c.stamps} חותמות ל${esc(reward)}`}</div>
 ${c.birthdayGift ? '<div style="margin-top:8px">🎂 מתנת יום הולדת מחכה לך – הציגי בקופה!</div>' : ''}</div>
@@ -51,7 +56,7 @@ ${c.birthdayGift ? '<div style="margin-top:8px">🎂 מתנת יום הולדת 
 new QRCode(document.getElementById('qr'),{text:${JSON.stringify(c.token)},width:220,height:220});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)location.reload()});
 try{localStorage.setItem('cardToken',${JSON.stringify(c.token)})}catch(e){}
-document.getElementById('save').onclick=()=>alert('באייפון: שיתוף ← הוספה למסך הבית. באנדרואיד: תפריט ← הוספה למסך הבית.');
+document.getElementById('save').onclick=()=>alert('באייפון: שיתוף ← הוספה למסך הבית. באנדרואיד: תפריט ← התקנת אפליקציה או הוספה למסך הבית. יופיע אייקון של העסק, והכרטיס ייפתח ישר.');
 </script>${foot}`
 }
 

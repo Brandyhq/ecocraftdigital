@@ -4,7 +4,7 @@ import { issueSession, pinMatches, sessionValid } from './auth.ts'
 import { purgeInactive } from './retention.ts'
 import {
   STAMP_COOLDOWN_SECONDS, birthdayAvailable, currentYear, newToken, normalizePhone,
-  parseBirthday, rewardReady, stampMultiplier, toCsv, formatPhone, formatIsraelTime, EVENT_LABELS,
+  parseBirthday, rewardReady, stampMultiplier, toCsv, formatPhone, formatIsraelTime, EVENT_LABELS, buildManifest,
 } from './logic.ts'
 import { cardPage, joinPage, privacyPage, staffLoginPage, staffPage } from './pages.ts'
 
@@ -70,6 +70,14 @@ app.post('/join', async (c) => {
     return page('כבר קיים כרטיס למספר הזה. בקשי מהצוות לשלוח לך שוב את הקישור.')
   }
   return c.redirect(`/c/${token}`)
+})
+
+app.get('/c/:token/manifest.webmanifest', async (c) => {
+  const card = await getByToken(c.env.DB, c.req.param('token'))
+  if (!card) return c.text('כרטיס לא נמצא', 404)
+  return c.body(JSON.stringify(buildManifest(c.env.SHOP_NAME, card.token)), 200, {
+    'Content-Type': 'application/manifest+json; charset=utf-8',
+  })
 })
 
 app.get('/c/:token', async (c) => {

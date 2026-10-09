@@ -93,3 +93,27 @@ export function formatIsraelTime(sqlUtc: string): string {
 }
 
 export const EVENT_LABELS: Record<string, string> = { stamp: 'חתימה', redeem: 'מימוש מתנה', birthday: 'מתנת יום הולדת' }
+
+export const THEME_COLOR = '#537c6d'
+
+/** Per-card web app manifest, so an installed app opens straight on that customer's card. */
+export function buildManifest(shop: string, token: string) {
+  const base = `/c/${token}`
+  return {
+    id: base,
+    name: shop,
+    short_name: shop.length > 12 ? shop.split(' ')[0] : shop,
+    start_url: base,
+    scope: base,
+    display: 'standalone',
+    lang: 'he',
+    dir: 'rtl',
+    theme_color: THEME_COLOR,
+    background_color: '#f6f1ea',
+    icons: [
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
+  }
+}
