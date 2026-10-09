@@ -68,3 +68,17 @@ test('formatIsraelTime converts UTC to Israel time, summer and winter', () => {
   assert.equal(formatIsraelTime('2026-10-08 22:30:00'), '2026-10-09 01:30') // crosses midnight
   assert.equal(formatIsraelTime('garbage'), 'garbage')
 })
+
+import { buildManifest } from '../src/logic.ts'
+
+test('buildManifest points at the card itself and nothing else', () => {
+  const m = buildManifest('קופילה בית קלייה ומטבח', 'abc123')
+  assert.equal(m.start_url, '/c/abc123')
+  assert.equal(m.scope, '/c/abc123')
+  assert.equal(m.id, '/c/abc123')
+  assert.equal(m.display, 'standalone')
+  assert.equal(m.dir, 'rtl')
+  assert.equal(m.short_name, 'קופילה') // long names are shortened for the home screen
+  assert.ok(m.icons.some((i) => i.sizes === '192x192') && m.icons.some((i) => i.purpose === 'maskable'))
+  assert.equal(buildManifest('קפה', 't').short_name, 'קפה')
+})
