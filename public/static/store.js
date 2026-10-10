@@ -109,7 +109,7 @@ function render(){
 }
 /* ---------- URLs: every page has a real, crawlable path (the server pre-renders them) ---------- */
 function pathFor(r){
-  if(r.name==='shop')return '/shop';
+  if(r.name==='shop')return '/shop'+(activeCat!=='all'?'?cat='+encodeURIComponent(activeCat):'');
   if(r.name==='about')return '/about';
   if(r.name==='cart')return '/cart';
   if(r.name==='checkout')return '/checkout';
@@ -118,7 +118,7 @@ function pathFor(r){
 }
 function routeFromPath(){
   const p=decodeURIComponent(location.pathname).replace(/\/+$/,'')||'/';
-  if(p==='/shop')return{name:'shop'};
+  if(p==='/shop'){const c=new URLSearchParams(location.search).get('cat');activeCat=c&&DATA.categories.some(x=>x.id===c)?c:'all';return{name:'shop'};}
   if(p==='/about')return{name:'about'};
   if(p==='/cart')return{name:'cart'};
   if(p==='/checkout')return{name:'checkout'};
@@ -138,6 +138,7 @@ function setDocMeta(){
   document.title=t;
 }
 function nav(name,extra,fromHistory){
+  if(name==='shop'&&!(extra&&extra.keepCat))activeCat='all';
   route={name,...(extra||{})};
   if(!fromHistory){try{history.pushState(null,'',pathFor(route));}catch(e){}}
   render();
@@ -151,7 +152,7 @@ function header(){
   return `<header><div class="wrap"><nav class="nav">
     <a class="logo" href="/" data-nav="home"><div class="mark">${esc(d.logoText||'ED')}</div>
       <div class="name">${esc(d.brandName)}<small>${esc(d.brandSub||'')}</small></div></a>
-    <div class="nav-links" id="navlinks">${links.map(l=>`<a data-nav="${l[0]}" class="${route.name===l[0]?'active':''}">${l[1]}</a>`).join('')}</div>
+    <div class="nav-links" id="navlinks">${links.map(l=>`<a href="${pathFor({name:l[0]})}" data-nav="${l[0]}" class="${route.name===l[0]?'active':''}"${route.name===l[0]?' aria-current="page"':''}>${l[1]}</a>`).join('')}</div>
     <div class="nav-icons">
       <button class="icon-btn hamburger" id="burger" aria-label="תפריט"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
       <a class="icon-btn" href="/cart" data-nav="cart" aria-label="עגלה"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>${cartCount()?`<span class="cart-count">${cartCount()}</span>`:''}</a>
@@ -161,28 +162,23 @@ function header(){
 
 /* ---------- home ---------- */
 function featuredList(){
-  const d=DATA.design, ids=d.featuredIds||[];
-  const picked=ids.map(id=>findP(id)).filter(Boolean);
-  return picked.length?picked:P().slice(0,3);
+  /* ids are resolved on the server: configured products that can actually be delivered, 3 to 4 of them */
+  return (DATA.featured||[]).map(id=>findP(id)).filter(Boolean);
 }
+function leadParas(t){return String(t||'').split('\n').filter(x=>x.trim()).map(x=>`<p class="lead">${esc(x)}</p>`).join('');}
 function heroSection(){
-  const d=DATA.design, style=d.heroStyle||'side', feat0=featuredList()[0];
+  const d=DATA.design, style=d.heroStyle||'side';
   const inner=`<div class="hero-grid">
     <div>
       <span class="eyebrow">${esc(d.heroEyebrow)}</span>
       <h1>${esc(d.heroTitle)}</h1>
-      <div class="sub">${esc(d.heroSubtitle||'')}</div>
-      <p class="lead">${esc(d.heroLead)}</p>
-      <div class="hero-cta">
-        <button class="btn btn-primary" data-nav="shop">לחנות המלאה <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform:scaleX(-1)"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
-        ${feat0?`<button class="btn btn-ghost" data-prod="${feat0.id}">${esc(feat0.name)} ›</button>`:''}
-      </div>
+      ${leadParas(d.heroLead)}
+      <div class="hero-cta"><a class="btn btn-primary" href="/shop" data-nav="shop">לכל המוצרים</a></div>
     </div>
     <div class="hero-media"><img src="${d.heroImg}" alt="${esc(d.brandName)}">
       ${d.heroBadge?`<div class="hero-badge"><span class="big">${esc(d.heroBadge)}</span><small>${esc(d.heroBadgeSub||'')}</small></div>`:''}
     </div>
-  </div>
-  <div class="trust">${(d.trust||[]).map(trustChip).join('')}</div>`;
+  </div>`;
   if(style==='bg'){
     return `<section class="hero style-bg"><div class="hero-bgimg" style="background-image:url('${d.heroImg}')"></div><div class="hero-overlay"></div><div class="wrap">${inner}</div></section>`;
   }
@@ -191,13 +187,20 @@ function heroSection(){
   }
   return `<section class="hero"><div class="blob a"></div><div class="blob b"></div><div class="wrap">${inner}</div></section>`;
 }
+function countLabel(n){return n===1?'מוצר אחד':n+' מוצרים';}
 function homeSection(id){
   const d=DATA.design;
   if(id==='featured'){
     return `<section class="block"><div class="wrap">
       <div class="sec-head"><span class="eyebrow">הנבחרים שלנו</span><h2>${esc(d.featuredTitle||'מוצרים אהובים במיוחד')}</h2><p>${esc(d.featuredSub||'')}</p></div>
       <div class="grid">${featuredList().map(cardHTML).join('')}</div>
-      <div style="text-align:center;margin-top:34px"><button class="btn btn-ghost" data-nav="shop">לכל המוצרים</button></div></div></section>`;
+      <div style="text-align:center;margin-top:34px"><a class="btn btn-ghost" href="/shop" data-nav="shop">עוד מוצרים בחנות</a></div></div></section>`;
+  }
+  if(id==='categories'){
+    const cats=DATA.categories.filter(c=>c.count>0);
+    if(!cats.length)return '';
+    return `<section class="block"><div class="wrap"><div class="sec-head"><span class="eyebrow">החנות</span><h2>בחרו קטגוריה</h2></div>
+      <div class="cat-grid">${cats.map(c=>`<a class="cat-card" href="/shop?cat=${encodeURIComponent(c.id)}" data-cat="${esc(c.id)}"><span class="cat-name">${esc(c.name)}</span><span class="cat-count">${countLabel(c.count)}</span></a>`).join('')}</div></div></section>`;
   }
   if(id==='features'){
     return `<section class="block band"><div class="wrap"><div class="feat-grid">${(d.features||[]).map(f=>feat(f.icon,f.title,f.body)).join('')}</div></div></section>`;
@@ -206,10 +209,26 @@ function homeSection(id){
     return `<section class="block"><div class="wrap"><div class="about-grid">
       <div class="about-media"><img src="${d.aboutImg||d.heroImg}" alt="${esc(d.brandName)}"></div>
       <div><span class="eyebrow">הסיפור שלנו</span><h2>${esc(d.aboutTitle)}</h2>${aboutParas(d.aboutText)}
-        <button class="btn btn-primary" data-nav="about">קראי עוד עלינו</button></div></div></div></section>`;
+        <a class="btn btn-primary" href="/about" data-nav="about">קראי עוד עלינו</a></div></div></div></section>`;
+  }
+  if(id==='info'){
+    const faq=(DATA.pages||[]).some(p=>p.slug==='faq');
+    return `<section class="block band"><div class="wrap"><div class="sec-head"><span class="eyebrow">לפני שקונים</span><h2>איך זה עובד</h2></div>
+      <div class="info-grid">${INFO_ITEMS.map(i=>`<div class="info-item"><h3>${i[0]}</h3><p>${i[1]}</p></div>`).join('')}</div>
+      ${faq?'<p class="info-more"><a href="/faq">לשאלות נפוצות</a> · <a href="/contact">צור קשר</a></p>':'<p class="info-more"><a href="/contact">צור קשר</a></p>'}</div></section>`;
+  }
+  if(id==='cta'){
+    return `<section class="block"><div class="wrap"><div class="cta-band"><h2>מוכנים להתחיל?</h2><p>עיינו במוצרים ובחרו את הכלי שמתאים לכם.</p><a class="btn btn-primary" href="/shop" data-nav="shop">לכל המוצרים</a></div></div></section>`;
   }
   return '';
 }
+/* Only statements that are true of how the store works (see the FAQ and the order flow). */
+const INFO_ITEMS=[
+  ['מוצרים דיגיטליים','כל המוצרים מיועדים להורדה. אין משלוח ואין צורך להמתין לדואר.'],
+  ['קישור הורדה אישי','לאחר אישור התשלום מתקבל קישור הורדה אישי לקבצים שרכשתם.'],
+  ['פירוט בכל מוצר','בעמוד של כל מוצר מופיעים תיאור מלא ומה כלול בו, כדי שתדעו מה מקבלים.'],
+  ['שאלה או תקלה?','כתבו לנו בעמוד צור קשר ונעזור.']
+];
 function homePage(){
   const secs=(DATA.design.homeSections||[]).filter(s=>s.on).map(s=>homeSection(s.id)).join('');
   return `<main>${heroSection()}${secs}</main>`;
@@ -234,12 +253,12 @@ function cardHTML(p){
 
 /* ---------- shop ---------- */
 function shopPage(){
-  const cats=[{id:'all',name:'הכל'}].concat(DATA.categories);
+  const cats=[{id:'all',name:'הכל'}].concat(DATA.categories.filter(c=>c.count>0));
   const list=activeCat==='all'?P():P().filter(p=>p.cat===activeCat);
   return `<main>
   <div class="page-head"><div class="wrap"><span class="eyebrow">החנות</span><h1>כל המוצרים הדיגיטליים</h1></div></div>
   <section class="block" style="padding-top:26px"><div class="wrap">
-    <div class="cats">${cats.map(c=>`<button class="cat-pill ${activeCat===c.id?'active':''}" data-cat="${c.id}">${esc(c.name)}</button>`).join('')}</div>
+    <div class="cats">${cats.map(c=>`<a class="cat-pill ${activeCat===c.id?'active':''}" href="${c.id==='all'?'/shop':'/shop?cat='+encodeURIComponent(c.id)}" data-cat="${esc(c.id)}">${esc(c.name)}</a>`).join('')}</div>
     <div class="grid">${list.map(cardHTML).join('')||'<p style="color:var(--ink-soft)">אין מוצרים בקטגוריה זו עדיין.</p>'}</div>
   </div></section></main>`;
 }
@@ -369,7 +388,7 @@ function footer(){
   return `<footer><div class="wrap"><div class="foot-grid${contactLinks(d)?' five':''}">
     <div><div class="logo" data-nav="home" style="margin-bottom:14px"><div class="mark">${esc(d.logoText||'ED')}</div><div class="name">${esc(d.brandName)}<small>${esc(d.brandSub||'')}</small></div></div>
       <p>${esc(d.footerTagline||'')}</p></div>
-    <div><h5>חנות</h5>${DATA.categories.map(c=>`<a data-cat="${c.id}">${esc(c.name)}</a>`).join('')}<a data-nav="shop">כל המוצרים</a></div>
+    <div><h5>חנות</h5>${DATA.categories.filter(c=>c.count>0).map(c=>`<a data-cat="${c.id}">${esc(c.name)}</a>`).join('')}<a data-nav="shop">כל המוצרים</a></div>
     <div><h5>מידע</h5><a href="/about" data-nav="about">עלינו</a>${(DATA.pages||[]).map(p=>`<a href="${pageHref(p.slug)}">${esc(p.title)}</a>`).join('')}<a href="/contact">צור קשר</a></div>
     ${contactLinks(d)?`<div><h5>יצירת קשר</h5>${contactLinks(d)}</div>`:''}
     <div><h5>הישארי מעודכנת</h5><p>קבלי טיפים ומבצעים ישירות למייל.</p><div class="newsletter"><input type="email" placeholder="האימייל שלך"><button class="btn btn-primary" id="subBtn">הרשמה</button></div></div>
@@ -390,7 +409,7 @@ function bind(){
   app.querySelectorAll('[data-prod]').forEach(el=>el.onclick=e=>{if(e.target.closest('[data-add]'))return;nav('product',{id:el.dataset.prod});});
   app.querySelectorAll('[data-add]').forEach(el=>el.onclick=e=>{e.stopPropagation();addToCart(el.dataset.add);});
   app.querySelectorAll('[data-buy]').forEach(el=>el.onclick=e=>{e.stopPropagation();addToCart(el.dataset.buy,true);nav('checkout');});
-  app.querySelectorAll('[data-cat]').forEach(el=>{if(el.tagName==='A')el.setAttribute('href','/shop');el.onclick=e=>{e.preventDefault();activeCat=el.dataset.cat;nav('shop');};});
+  app.querySelectorAll('[data-cat]').forEach(el=>{if(el.tagName==='A'&&!el.getAttribute('href'))el.setAttribute('href','/shop?cat='+encodeURIComponent(el.dataset.cat));el.onclick=e=>{e.preventDefault();activeCat=el.dataset.cat;nav('shop',{keepCat:true});};});
   app.querySelectorAll('[data-inc]').forEach(el=>el.onclick=()=>{setQty(el.dataset.inc,(cart[el.dataset.inc]||0)+1);render();});
   app.querySelectorAll('[data-dec]').forEach(el=>el.onclick=()=>{setQty(el.dataset.dec,(cart[el.dataset.dec]||0)-1);render();});
   app.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{delete cart[el.dataset.remove];saveCart();render();});

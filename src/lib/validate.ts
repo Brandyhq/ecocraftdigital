@@ -108,7 +108,7 @@ export function parseProduct(body: unknown): Parsed<ProductInput> {
   }
 }
 
-const HOME_SECTIONS = ['featured', 'features', 'about']
+const HOME_SECTIONS = ['featured', 'categories', 'about', 'info', 'cta', 'features']
 const HERO_STYLES = ['side', 'center', 'bg']
 const ICONS = ['bolt', 'heart', 'globe', 'star', 'gift']
 

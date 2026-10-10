@@ -351,7 +351,7 @@ function productForm(p) {
 
 /* ---------------------------------------------------------------- design */
 const ICONS = [['bolt', '⚡ ברק'], ['heart', '❤ לב'], ['globe', '🌐 גלובוס'], ['star', '★ כוכב'], ['gift', '🎁 מתנה']]
-const SECTION_NAMES = { featured: 'מוצרים נבחרים', features: 'יתרונות', about: 'אודות' }
+const SECTION_NAMES = { featured: 'מוצרים נבחרים', categories: 'קטגוריות', about: 'סיפור המותג (אודות)', info: 'איך זה עובד (הורדה ותמיכה)', cta: 'קריאה לפעולה', features: 'יתרונות (טקסט חופשי)' }
 
 function renderDesign() {
   const d = state.cache.design

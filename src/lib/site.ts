@@ -20,13 +20,54 @@ type ProductRow = {
   cover_from: string
   cover_to: string
   paypal_url: string
+  file_url: string
+  file_id: string | null
 }
 
-const DEFAULT_SECTIONS = [
+/** Default home hero copy; stored values (editable in the back office) win, these fill empty fields only. */
+export const DEFAULT_HERO = {
+  heroTitle: 'פשוט יותר. חכם יותר. מודע יותר.',
+  heroLead:
+    'מוצרים דיגיטליים שנוצרו מתוך מחשבה, כדי לעזור לכם להתארגן, ליצור ולעבוד בצורה פשוטה ויעילה יותר.\nמתבניות שימושיות ועד כלי יצירה ובינה מלאכותית — כאן תמצאו פתרונות שנועדו להפוך רעיונות למעשים ולהקל על הדברים הקטנים והגדולים בחיים.'
+}
+
+type Section = { id: string; on: boolean }
+
+/** Order of the home page sections. "features" (free-text claims) is off by default; "info" replaces it with verified facts. */
+const DEFAULT_SECTIONS: Section[] = [
   { id: 'featured', on: true },
-  { id: 'features', on: true },
-  { id: 'about', on: true }
+  { id: 'categories', on: true },
+  { id: 'about', on: true },
+  { id: 'info', on: true },
+  { id: 'cta', on: true },
+  { id: 'features', on: false }
 ]
+const NEW_SECTION_IDS = ['categories', 'info', 'cta']
+
+/**
+ * A stored list written before the new sections existed is treated as legacy and replaced by the default
+ * order; once the back office saves a list that already contains them, that list is respected as is.
+ */
+function normalizeSections(stored: unknown): Section[] {
+  if (!Array.isArray(stored) || !stored.length) return DEFAULT_SECTIONS
+  const ids = stored.map((s: Section) => s?.id)
+  if (!NEW_SECTION_IDS.every((id) => ids.includes(id))) return DEFAULT_SECTIONS
+  return stored.filter((s: Section) => s && typeof s.id === 'string').map((s: Section) => ({ id: s.id, on: s.on !== false }))
+}
+
+/**
+ * Featured products for the home page: configured ids first, only products that actually have a delivery
+ * file or link (nothing is sold on the home page that cannot be delivered), 3 to 4 items.
+ */
+function pickFeatured(products: { id: string; deliverable: boolean }[], ids: string[]): string[] {
+  const ok = (id: string) => products.some((p) => p.id === id && p.deliverable)
+  const picked = ids.filter(ok).slice(0, 4)
+  for (const p of products) {
+    if (picked.length >= 3) break
+    if (p.deliverable && !picked.includes(p.id)) picked.push(p.id)
+  }
+  return picked
+}
 
 /** Shape consumed by public/static/store.js. Never includes private file links. */
 export async function getSiteData(db: D1Database) {
@@ -50,14 +91,12 @@ export async function getSiteData(db: D1Database) {
       /* fall through to defaults */
     }
   }
-  design.homeSections ??= DEFAULT_SECTIONS
+  design.heroTitle ||= DEFAULT_HERO.heroTitle
+  design.heroLead ||= DEFAULT_HERO.heroLead
+  design.homeSections = normalizeSections(design.homeSections)
   design.featuredIds ??= []
 
-  return {
-    design,
-    categories: categories.results,
-    pages: pages.results as { slug: string; title: string }[],
-    products: (products.results as ProductRow[]).map((p) => ({
+  const list = (products.results as ProductRow[]).map((p) => ({
       id: p.slug,
       cat: p.category_id ?? '',
       catName: p.category_name ?? '',
@@ -76,8 +115,21 @@ export async function getSiteData(db: D1Database) {
       coverSub: p.cover_sub,
       coverFrom: p.cover_from,
       coverTo: p.cover_to,
-      paypalUrl: p.paypal_url
+      paypalUrl: p.paypal_url,
+      // Only whether something can be delivered is public; the file link itself never leaves the server.
+      deliverable: !!(p.file_id || (p.file_url && p.file_url.trim()))
     }))
+
+  const counts = new Map<string, number>()
+  for (const p of list) if (p.cat) counts.set(p.cat, (counts.get(p.cat) ?? 0) + 1)
+
+  return {
+    design,
+    // Same categories as in the database, with how many active products each one has.
+    categories: (categories.results as { id: string; name: string }[]).map((c) => ({ ...c, count: counts.get(c.id) ?? 0 })),
+    featured: pickFeatured(list, design.featuredIds as string[]),
+    pages: pages.results as { slug: string; title: string }[],
+    products: list
   }
 }
 
