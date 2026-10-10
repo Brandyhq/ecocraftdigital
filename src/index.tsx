@@ -53,13 +53,16 @@ app.get('/', async (c) => {
 app.get('/shop', async (c) => {
   const site = await getSiteData(c.env.DB)
   const d = design(site)
+  const catId = c.req.query('cat') ?? 'all'
+  const cat = site.categories.find((x) => x.id === catId && x.count > 0)
   return c.html(
     page({
+      // A category view is a filtered copy of /shop, so it points its canonical at /shop.
       origin: originOf(c), path: '/shop', site,
-      title: `כל המוצרים הדיגיטליים | ${d.brandName}`,
+      title: cat ? `${cat.name} | ${d.brandName}` : `כל המוצרים הדיגיטליים | ${d.brandName}`,
       description: clip(`מתכננים דיגיטליים, משחקי למידה וקורסים בעברית — ${site.products.map((p) => p.name).join(', ')}.`),
       image: d.heroImg,
-      body: shopBody(site)
+      body: shopBody(site, cat ? cat.id : 'all')
     })
   )
 })
