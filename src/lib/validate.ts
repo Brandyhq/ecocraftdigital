@@ -162,6 +162,7 @@ export function parseDesign(body: unknown): Parsed<Design> {
       contactPhone: /^[0-9+\-\s]{7,20}$/.test(text(body.contactPhone, 20)) ? text(body.contactPhone, 20) : '',
       whatsappUrl: httpsUrl(body.whatsappUrl) || '',
       instagramUrl: httpsUrl(body.instagramUrl) || '',
+      bitUrl: httpsUrl(body.bitUrl) || '',
       businessName: text(body.businessName, 120),
       businessId: text(body.businessId, 60),
       aboutSections: (Array.isArray(body.aboutSections) ? body.aboutSections : [])

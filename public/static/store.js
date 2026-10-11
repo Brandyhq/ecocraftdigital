@@ -304,8 +304,8 @@ function checkoutPage(){
       <div class="field"><label for="coName">שם מלא</label><input type="text" id="coName" autocomplete="name" placeholder="השם שלך" maxlength="120"></div>
       <div class="field"><label for="coEmail">כתובת אימייל</label><input type="email" id="coEmail" autocomplete="email" placeholder="name@example.com" maxlength="200"></div>
       <div class="field"><label for="coPhone">טלפון (לא חובה)</label><input type="tel" id="coPhone" autocomplete="tel" placeholder="050-0000000" maxlength="30"></div></div>
-    <div class="co-card"><h3><span class="step-n">2</span> תשלום ב-PayPal</h3>
-      <p class="co-sub">אחרי שליחת ההזמנה תקבלי קישור תשלום מאובטח ב-PayPal. הקובץ נשלח לאימייל ברגע שהתשלום מאושר.</p>
+    <div class="co-card"><h3><span class="step-n">2</span> תשלום</h3>
+      <p class="co-sub">אחרי שליחת ההזמנה יוצג מספר ההזמנה וכפתורי התשלום. הקובץ נשלח לאימייל לאחר שנאשר ידנית את קבלת התשלום.</p>
       <div class="pay-lines">${items.map(({p,q})=>`<div class="pay-line"><div class="pl-info"><div class="pi">${esc(p.name)}</div><div class="pd-note">${money(p.price)}${q>1?' × '+q:''}</div></div></div>`).join('')}</div>
     </div>
   </div>
@@ -327,18 +327,20 @@ function successPage(){
     <div style="margin-top:22px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><button class="btn btn-ghost" data-nav="shop">להמשך קנייה</button><button class="btn btn-ghost" data-nav="home">לדף הבית</button></div>
   </div></div></main>`;
   if(!o)return `<main><div class="wrap"><div class="success"><h1>לא נמצאה הזמנה</h1><div style="margin-top:26px"><button class="btn btn-primary" data-nav="shop">לחנות</button></div></div></div></main>`;
+  const bit=DATA.design.bitUrl||'';
   const rows=o.items.map(i=>`
     <div class="dl-row"><div class="dl-info"><h4>${esc(i.name)}${i.quantity>1?' × '+i.quantity:''}</h4>
       ${i.paypalUrl
         ?`<a class="btn btn-primary btn-sm" href="${esc(i.paypalUrl)}" target="_blank" rel="noopener">תשלום ${money(i.price*i.quantity)} ב-PayPal</a>`
-        :`<span class="dl-pending">קישור התשלום יישלח אלייך באימייל</span>`}
+        :''}
     </div></div>`).join('');
   return `<main><div class="wrap"><div class="success">
     <div class="checkwrap">${iconCheck()}</div>
     <h1>ההזמנה התקבלה!</h1><p>מספר הזמנה: <b>#${esc(o.id)}</b> · סה"כ ${money(o.total)}</p>
-    <p>כדי להשלים את הרכישה, שלמי דרך PayPal. ברגע שנאשר את התשלום נשלח את הקובץ לאימייל <b>${esc(o.email)}</b>.</p>
-    <div class="dl-list">${rows}</div>
-    <p style="font-size:13.5px;color:var(--ink-soft);margin-top:18px">בפרטי התשלום ב-PayPal צייני את מספר ההזמנה #${esc(o.id)}.</p>
+    <p>כדי להשלים את הרכישה, שלמי <b>${money(o.total)}</b> באחת מהדרכים. לאחר שנאשר את קבלת התשלום (ידנית, בדרך כלל בתוך יום עסקים) נשלח את הקובץ לאימייל <b>${esc(o.email)}</b>.</p>
+    <div class="dl-list">${bit?`<div class="dl-row"><div class="dl-info"><h4>תשלום ב-Bit</h4><a class="btn btn-primary btn-sm" href="${esc(bit)}" target="_blank" rel="noopener">לתשלום ${money(o.total)} ב-Bit</a></div></div>`:''}${rows}</div>
+    ${bit||o.items.some(i=>i.paypalUrl)?'':`<p class="dl-pending">פרטי התשלום יישלחו אלייך באימייל <b>${esc(o.email)}</b>.</p>`}
+    <p style="font-size:13.5px;color:var(--ink-soft);margin-top:18px"><b>חשוב:</b> סכום התשלום הוא ${money(o.total)}. בהערה לתשלום כתבי את מספר ההזמנה #${esc(o.id)}, כדי שנוכל לזהות אותו.</p>
     <div style="margin-top:26px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><button class="btn btn-primary" data-nav="shop">להמשך קנייה</button><button class="btn btn-ghost" data-nav="home">לדף הבית</button></div>
   </div></div></main>`;
 }

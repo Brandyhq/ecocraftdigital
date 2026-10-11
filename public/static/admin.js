@@ -391,7 +391,7 @@ function renderDesign() {
         <button type="button" class="btn danger sm" data-act="aboutDelete" data-i="${i}">הסרה</button></div>`).join('')}
       ${(d.aboutSections || []).length < 8 ? '<button type="button" class="btn ghost" data-act="aboutAdd">+ פרק</button>' : ''}</div>
     <div class="card"><h3>פרטי קשר ועסק</h3><p class="hint" style="margin-top:-8px">מופיעים בעמוד "צור קשר", בפוטר ובעמודים המשפטיים. שדה ריק לא יוצג.</p>
-      <div class="row">${t('אימייל', 'contactEmail', d.contactEmail, 'type="email" dir="ltr"')}${t('טלפון / וואטסאפ', 'contactPhone', d.contactPhone, 'dir="ltr"')}${t('קישור לערוץ וואטסאפ', 'whatsappUrl', d.whatsappUrl, 'dir="ltr" placeholder="https://whatsapp.com/channel/…"')}${t('קישור לאינסטגרם', 'instagramUrl', d.instagramUrl, 'dir="ltr" placeholder="https://instagram.com/…"')}
+      <div class="row">${t('אימייל', 'contactEmail', d.contactEmail, 'type="email" dir="ltr"')}${t('טלפון / וואטסאפ', 'contactPhone', d.contactPhone, 'dir="ltr"')}${t('קישור לערוץ וואטסאפ', 'whatsappUrl', d.whatsappUrl, 'dir="ltr" placeholder="https://whatsapp.com/channel/…"')}${t('קישור לאינסטגרם', 'instagramUrl', d.instagramUrl, 'dir="ltr" placeholder="https://instagram.com/…"')}${t('קישור תשלום ב-Bit', 'bitUrl', d.bitUrl, 'dir="ltr" placeholder="https://www.bitpay.co.il/app/…"')}
       ${t('שם העסק (לתקנון)', 'businessName', d.businessName)}${t('עוסק מורשה / פטור (מספר)', 'businessId', d.businessId)}</div></div>
     <div class="sticky-save"><button class="btn primary" type="submit">שמירה ופרסום</button></div></form>`
   $('#designForm').onsubmit = guard(async (e) => {
@@ -407,7 +407,7 @@ function readDesign() {
   const form = $('#designForm')
   const fd = new FormData(form)
   const d = { ...state.cache.design }
-  for (const k of ['brandName', 'brandSub', 'logoText', 'currency', 'headingFont', 'heroStyle', 'heroEyebrow', 'heroTitle', 'heroSubtitle', 'heroBadge', 'heroBadgeSub', 'heroLead', 'heroImg', 'featuredTitle', 'featuredSub', 'aboutTitle', 'aboutText', 'aboutImg', 'footerTagline', 'contactEmail', 'contactPhone', 'whatsappUrl', 'instagramUrl', 'businessName', 'businessId']) d[k] = fd.get(k) ?? ''
+  for (const k of ['brandName', 'brandSub', 'logoText', 'currency', 'headingFont', 'heroStyle', 'heroEyebrow', 'heroTitle', 'heroSubtitle', 'heroBadge', 'heroBadgeSub', 'heroLead', 'heroImg', 'featuredTitle', 'featuredSub', 'aboutTitle', 'aboutText', 'aboutImg', 'footerTagline', 'contactEmail', 'contactPhone', 'whatsappUrl', 'instagramUrl', 'bitUrl', 'businessName', 'businessId']) d[k] = fd.get(k) ?? ''
   d.colors = Object.fromEntries(['sage', 'sageDeep', 'rose', 'cream', 'ink'].map((k) => [k, fd.get('color_' + k)]))
   d.trust = String(fd.get('trust') || '').split('\n').map((x) => x.trim()).filter(Boolean)
   d.featuredIds = fd.getAll('featured')
