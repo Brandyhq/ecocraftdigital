@@ -48,7 +48,7 @@ export const pageHref = (slug: string) => (SYSTEM_PAGES.includes(slug) ? `/${slu
 
 function footer(site: Site) {
   const d = site.design as Design
-  const cats = site.categories as { id: string; name: string }[]
+  const cats = site.categories.filter((c) => c.count > 0)
   const info = [
     `<a href="/about" data-nav="about">עלינו</a>`,
     ...site.pages.map((p) => `<a href="${pageHref(p.slug)}">${e(p.title)}</a>`),
@@ -62,7 +62,7 @@ function footer(site: Site) {
   ].filter(Boolean)
   return `<footer><div class="wrap"><div class="foot-grid">
     <div><a class="logo" href="/" data-nav="home" style="margin-bottom:14px"><div class="mark">${e(d.logoText || 'ED')}</div><div class="name">${e(d.brandName)}<small>${e(d.brandSub || '')}</small></div></a><p>${e(d.footerTagline || '')}</p></div>
-    <div><h5>חנות</h5>${cats.map((c) => `<a href="/shop" data-cat="${e(c.id)}">${e(c.name)}</a>`).join('')}<a href="/shop" data-nav="shop">כל המוצרים</a></div>
+    <div><h5>חנות</h5>${cats.map((c) => `<a href="/shop?cat=${encodeURIComponent(c.id)}" data-cat="${e(c.id)}">${e(c.name)}</a>`).join('')}<a href="/shop" data-nav="shop">כל המוצרים</a></div>
     <div><h5>מידע</h5>${info.join('')}</div>
     ${social.length ? `<div><h5>יצירת קשר</h5>${social.join('')}</div>` : ''}
   </div><div class="foot-bottom"><span>© 2026 ${e(d.brandName)} · כל הזכויות שמורות</span></div></div></footer>`
@@ -75,36 +75,61 @@ function card(d: Design, p: Product) {
     <div class="foot"><div class="price">${money(d, p.price)}${p.old ? `<span class="old">${money(d, p.old as number)}</span>` : ''}</div></div></div></div>`
 }
 
+const leadParas = (t: string) => String(t || '').split('\n').filter((x) => x.trim()).map((x) => `<p class="lead">${e(x)}</p>`).join('')
+const countLabel = (n: number) => (n === 1 ? 'מוצר אחד' : `${n} מוצרים`)
+
+/** Only statements that are true of how the store works (see the FAQ and the order flow). Keep in sync with store.js. */
+export const INFO_ITEMS: [string, string][] = [
+  ['מוצרים דיגיטליים', 'כל המוצרים מיועדים להורדה. אין משלוח ואין צורך להמתין לדואר.'],
+  ['קישור הורדה אישי', 'לאחר אישור התשלום מתקבל קישור הורדה אישי לקבצים שרכשתם.'],
+  ['פירוט בכל מוצר', 'בעמוד של כל מוצר מופיעים תיאור מלא ומה כלול בו, כדי שתדעו מה מקבלים.'],
+  ['שאלה או תקלה?', 'כתבו לנו בעמוד צור קשר ונעזור.']
+]
+
 export function homeBody(site: Site) {
   const d = site.design as Design
-  const ids: string[] = d.featuredIds || []
-  const picked = ids.map((id) => site.products.find((p) => p.id === id)).filter(Boolean) as Product[]
-  const featured = picked.length ? picked : site.products.slice(0, 3)
+  const featured = site.featured.map((id) => site.products.find((p) => p.id === id)).filter(Boolean) as Product[]
   const sec = (id: string) => {
     if (id === 'featured')
       return `<section class="block"><div class="wrap"><div class="sec-head"><span class="eyebrow">הנבחרים שלנו</span><h2>${e(d.featuredTitle || 'מוצרים אהובים במיוחד')}</h2><p>${e(d.featuredSub || '')}</p></div>
-        <div class="grid">${featured.map((p) => card(d, p)).join('')}</div><div style="text-align:center;margin-top:34px"><a class="btn btn-ghost" href="/shop" data-nav="shop">לכל המוצרים</a></div></div></section>`
+        <div class="grid">${featured.map((p) => card(d, p)).join('')}</div><div style="text-align:center;margin-top:34px"><a class="btn btn-ghost" href="/shop" data-nav="shop">עוד מוצרים בחנות</a></div></div></section>`
+    if (id === 'categories') {
+      const cats = site.categories.filter((c) => c.count > 0)
+      if (!cats.length) return ''
+      return `<section class="block"><div class="wrap"><div class="sec-head"><span class="eyebrow">החנות</span><h2>בחרו קטגוריה</h2></div>
+        <div class="cat-grid">${cats.map((c) => `<a class="cat-card" href="/shop?cat=${encodeURIComponent(c.id)}" data-cat="${e(c.id)}"><span class="cat-name">${e(c.name)}</span><span class="cat-count">${countLabel(c.count)}</span></a>`).join('')}</div></div></section>`
+    }
     if (id === 'features') return `<section class="block band"><div class="wrap"><div class="feat-grid">${(d.features || []).map(feat).join('')}</div></div></section>`
     if (id === 'about')
       return `<section class="block"><div class="wrap"><div class="about-grid"><div class="about-media"><img src="${e(d.aboutImg || d.heroImg)}" alt="${e(d.brandName)}" loading="lazy"></div>
         <div><span class="eyebrow">הסיפור שלנו</span><h2>${e(d.aboutTitle)}</h2>${paras(d.aboutText)}<a class="btn btn-primary" href="/about" data-nav="about">קראי עוד עלינו</a></div></div></div></section>`
+    if (id === 'info') {
+      const faq = site.pages.some((p) => p.slug === 'faq')
+      return `<section class="block band"><div class="wrap"><div class="sec-head"><span class="eyebrow">לפני שקונים</span><h2>איך זה עובד</h2></div>
+        <div class="info-grid">${INFO_ITEMS.map((i) => `<div class="info-item"><h3>${e(i[0])}</h3><p>${e(i[1])}</p></div>`).join('')}</div>
+        ${faq ? '<p class="info-more"><a href="/faq">לשאלות נפוצות</a> · <a href="/contact">צור קשר</a></p>' : '<p class="info-more"><a href="/contact">צור קשר</a></p>'}</div></section>`
+    }
+    if (id === 'cta')
+      return `<section class="block"><div class="wrap"><div class="cta-band"><h2>מוכנים להתחיל?</h2><p>עיינו במוצרים ובחרו את הכלי שמתאים לכם.</p><a class="btn btn-primary" href="/shop" data-nav="shop">לכל המוצרים</a></div></div></section>`
     return ''
   }
-  const first = featured[0]
   const hero = `<section class="hero"><div class="blob a"></div><div class="blob b"></div><div class="wrap"><div class="hero-grid"><div>
-    <span class="eyebrow">${e(d.heroEyebrow)}</span><h1>${e(d.heroTitle)}</h1><div class="sub">${e(d.heroSubtitle || '')}</div><p class="lead">${e(d.heroLead)}</p>
-    <div class="hero-cta"><a class="btn btn-primary" href="/shop" data-nav="shop">לחנות המלאה</a>${first ? `<a class="btn btn-ghost" href="/product/${encodeURIComponent(first.id)}" data-plink>${e(first.name)} ›</a>` : ''}</div></div>
-    <div class="hero-media"><img src="${e(d.heroImg)}" alt="${e(d.brandName)}"></div></div>
-    <div class="trust">${(d.trust || []).map((t: string) => `<div class="chip">${check}${e(t)}</div>`).join('')}</div></div></section>`
+    <span class="eyebrow">${e(d.heroEyebrow)}</span><h1>${e(d.heroTitle)}</h1>${leadParas(d.heroLead)}
+    <div class="hero-cta"><a class="btn btn-primary" href="/shop" data-nav="shop">לכל המוצרים</a></div></div>
+    <div class="hero-media"><img src="${e(d.heroImg)}" alt="${e(d.brandName)}"></div></div></div></section>`
   return header(d, 'home') + `<main>${hero}${(d.homeSections || []).filter((s: Design) => s.on).map((s: Design) => sec(s.id)).join('')}</main>` + footer(site)
 }
 
-export function shopBody(site: Site) {
+export function shopBody(site: Site, cat = 'all') {
   const d = site.design as Design
+  const cats = [{ id: 'all', name: 'הכל' }, ...site.categories.filter((c) => c.count > 0)]
+  const list = cat === 'all' ? site.products : site.products.filter((p) => p.cat === cat)
   return (
     header(d, 'shop') +
     `<main><div class="page-head"><div class="wrap"><span class="eyebrow">החנות</span><h1>כל המוצרים הדיגיטליים</h1></div></div>
-    <section class="block" style="padding-top:26px"><div class="wrap"><div class="grid">${site.products.map((p) => card(d, p)).join('')}</div></div></section></main>` +
+    <section class="block" style="padding-top:26px"><div class="wrap">
+    <div class="cats">${cats.map((c) => `<a class="cat-pill ${cat === c.id ? 'active' : ''}" href="${c.id === 'all' ? '/shop' : `/shop?cat=${encodeURIComponent(c.id)}`}" data-cat="${e(c.id)}">${e(c.name)}</a>`).join('')}</div>
+    <div class="grid">${list.map((p) => card(d, p)).join('')}</div></div></section></main>` +
     footer(site)
   )
 }
