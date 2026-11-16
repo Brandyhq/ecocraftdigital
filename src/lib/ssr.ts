@@ -251,7 +251,6 @@ function videoLd(p: Product, origin: string) {
     name: `${p.name} - סרטון`,
     description: p.short || p.desc || p.name,
     thumbnailUrl: [v.thumb || abs(origin, gallerySlides(p)[0])],
-    ...(v.uploaded ? { uploadDate: v.uploaded } : {}),
     ...(v.kind === 'file' ? { contentUrl: v.url } : { embedUrl: v.embed })
   }
 }

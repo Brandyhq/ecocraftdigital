@@ -14,7 +14,6 @@ type ProductRow = {
   image_url: string
   images?: string | null
   video_url?: string | null
-  created_at?: string | null
   short_description: string
   description: string
   includes: string
@@ -35,8 +34,7 @@ function parseImages(raw: string | null | undefined): string[] {
 }
 
 function videoOf(p: ProductRow) {
-  const v = parseVideo(p.video_url)
-  return v ? { ...v, uploaded: (p.created_at ?? '').replace(' ', 'T').slice(0, 10) } : null
+  return parseVideo(p.video_url)
 }
 
 const DEFAULT_SECTIONS = [

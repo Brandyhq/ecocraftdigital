@@ -276,8 +276,8 @@ function initGallery(root){
   function play(slide){
     const kind=slide.dataset.kind, src=slide.dataset.embed||'';let el;
     if(kind==='file'&&/^https:\/\//.test(src)){el=document.createElement('video');el.src=src;el.controls=true;el.autoplay=true;el.playsInline=true;}
-    else if(/^https:\/\/(www\.youtube-nocookie\.com\/embed\/[\w-]{11}|player\.vimeo\.com\/video\/\d+)$/.test(src)){
-      el=document.createElement('iframe');el.src=src+'?autoplay=1'+(kind==='youtube'?'&rel=0':'');
+    else if(/^https:\/\/(www\.youtube-nocookie\.com\/embed\/[\w-]{11}|player\.vimeo\.com\/video\/\d+(\?h=\w{6,20})?)$/.test(src)){
+      el=document.createElement('iframe');el.src=src+(src.includes('?')?'&':'?')+'autoplay=1'+(kind==='youtube'?'&rel=0':'');
       el.allow='autoplay; encrypted-media; picture-in-picture; fullscreen';el.allowFullscreen=true;el.title='סרטון המוצר';
     } else return;
     el.className='g-embed';slide.appendChild(el);slide.dataset.playing='1';slide.querySelector('.g-play').hidden=true;

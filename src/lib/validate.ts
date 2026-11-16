@@ -56,9 +56,17 @@ export function parseVideo(v: unknown): { kind: 'youtube' | 'vimeo' | 'file'; em
     return { kind: 'youtube', embed: `https://www.youtube-nocookie.com/embed/${id}`, url: `https://www.youtube.com/watch?v=${id}`, thumb: `https://i.ytimg.com/vi/${id}/hqdefault.jpg` }
   }
   if (host === 'vimeo.com' || host === 'player.vimeo.com') {
-    const id = u.pathname.match(/(\d{5,12})/)?.[1]
-    if (!id) return null
-    return { kind: 'vimeo', embed: `https://player.vimeo.com/video/${id}`, url: `https://vimeo.com/${id}`, thumb: '' }
+    const m = u.pathname.match(/(\d{5,12})(?:\/([\w]+))?/)
+    if (!m) return null
+    // Unlisted videos need their privacy hash, either as /ID/HASH or ?h=HASH.
+    const hash = m[2] || u.searchParams.get('h') || ''
+    if (hash && !/^\w{6,20}$/.test(hash)) return null
+    return {
+      kind: 'vimeo',
+      embed: `https://player.vimeo.com/video/${m[1]}${hash ? `?h=${hash}` : ''}`,
+      url: `https://vimeo.com/${m[1]}${hash ? `/${hash}` : ''}`,
+      thumb: ''
+    }
   }
   if (/\.(mp4|webm)$/i.test(u.pathname)) return { kind: 'file', embed: s, url: s, thumb: '' }
   return null
