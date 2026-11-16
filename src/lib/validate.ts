@@ -36,6 +36,36 @@ export function imageSrc(v: unknown): string | null {
   return httpsUrl(s)
 }
 
+const YT_ID = /^[\w-]{11}$/
+
+/** Accepts YouTube, Vimeo or a direct https video file. Returns the privacy-friendly embed used by the storefront. */
+export function parseVideo(v: unknown): { kind: 'youtube' | 'vimeo' | 'file'; embed: string; url: string; thumb: string } | null {
+  const s = text(v, 500)
+  if (!s) return null
+  let u: URL
+  try {
+    u = new URL(s)
+  } catch {
+    return null
+  }
+  if (u.protocol !== 'https:') return null
+  const host = u.hostname.replace(/^www\./, '').replace(/^m\./, '')
+  if (host === 'youtu.be' || host === 'youtube.com') {
+    const id = host === 'youtu.be' ? u.pathname.slice(1) : u.searchParams.get('v') || u.pathname.match(/^\/(?:embed|shorts)\/([\w-]{11})/)?.[1] || ''
+    if (!YT_ID.test(id)) return null
+    return { kind: 'youtube', embed: `https://www.youtube-nocookie.com/embed/${id}`, url: `https://www.youtube.com/watch?v=${id}`, thumb: `https://i.ytimg.com/vi/${id}/hqdefault.jpg` }
+  }
+  if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+    const id = u.pathname.match(/(\d{5,12})/)?.[1]
+    if (!id) return null
+    return { kind: 'vimeo', embed: `https://player.vimeo.com/video/${id}`, url: `https://vimeo.com/${id}`, thumb: '' }
+  }
+  if (/\.(mp4|webm)$/i.test(u.pathname)) return { kind: 'file', embed: s, url: s, thumb: '' }
+  return null
+}
+
+export const MAX_GALLERY_IMAGES = 5
+
 export type ProductInput = {
   slug: string | null
   name: string
@@ -50,6 +80,8 @@ export type ProductInput = {
   rating: number
   reviews: number
   image_url: string
+  images: string[]
+  video_url: string
   cover_title: string
   cover_sub: string
   cover_from: string
@@ -73,6 +105,15 @@ export function parseProduct(body: unknown): Parsed<ProductInput> {
   if (slug && !/^[a-z0-9][a-z0-9-]*$/.test(slug)) return fail('מזהה (slug) יכול להכיל רק אותיות לועזיות קטנות, ספרות ומקפים')
   const image = imageSrc(body.image_url)
   if (image === null) return fail('כתובת תמונה לא תקינה')
+  const images: string[] = []
+  for (const raw of Array.isArray(body.images) ? body.images : []) {
+    const src = imageSrc(raw)
+    if (src === null) return fail('כתובת תמונה בגלריה אינה תקינה')
+    if (src && !images.includes(src) && src !== image) images.push(src)
+  }
+  if (images.length > MAX_GALLERY_IMAGES) return fail(`אפשר להוסיף עד ${MAX_GALLERY_IMAGES} תמונות לגלריה`)
+  const videoRaw = text(body.video_url, 500)
+  if (videoRaw && !parseVideo(videoRaw)) return fail('קישור הסרטון חייב להיות https מ-YouTube או Vimeo, או קובץ mp4/webm')
   const paypal = httpsUrl(body.paypal_url)
   if (paypal === null) return fail('קישור PayPal חייב להתחיל ב-https://')
   const fileUrl = httpsUrl(body.file_url)
@@ -95,6 +136,8 @@ export function parseProduct(body: unknown): Parsed<ProductInput> {
       rating: Math.min(5, Math.max(0, num(body.rating, 5) ?? 5)),
       reviews: Math.max(0, Math.floor(num(body.reviews, 0) ?? 0)),
       image_url: image,
+      images,
+      video_url: videoRaw,
       cover_title: text(body.cover_title, 100),
       cover_sub: text(body.cover_sub, 100),
       cover_from: color(body.cover_from),

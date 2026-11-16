@@ -327,6 +327,11 @@ function productForm(p) {
       <div class="row">${f('כותרת עטיפה', 'cover_title', p.cover_title, 'maxlength="100"')}${f('כותרת משנה', 'cover_sub', p.cover_sub, 'maxlength="100"')}
       <div class="field"><label>צבע התחלה</label><input type="color" name="cover_from" value="${esc(p.cover_from || '#6E8767')}"></div>
       <div class="field"><label>צבע סיום</label><input type="color" name="cover_to" value="${esc(p.cover_to || '#4F634A')}"></div></div></div>
+    <div class="card"><h3>גלריה וסרטון</h3>
+      <p class="hint">התמונה שלמעלה היא הראשית. כאן אפשר להוסיף עד 5 תמונות נוספות. כדי להסיר תמונה, מחקי את הכתובת בשדה.</p>
+      ${[0, 1, 2, 3, 4].map((i) => `<div class="field"><label>תמונה נוספת ${i + 1}</label>${imagePicker('images_' + i, (p.images || [])[i])}</div>`).join('')}
+      <div class="field"><label>קישור לסרטון (לא חובה)</label><input type="url" name="video_url" dir="ltr" placeholder="https://www.youtube.com/watch?v=… או Vimeo או קובץ mp4" value="${esc(p.video_url || '')}">
+        <p class="hint">הסרטון נטען רק אחרי לחיצה על ניגון, ומוצג רק כשיש לפחות תמונה אחת (היא משמשת כתמונת פתיחה).</p></div></div>
     <div class="card"><h3>תשלום ומסירה</h3>
       <div class="field"><label>קישור תשלום PayPal</label><input type="url" name="paypal_url" dir="ltr" placeholder="https://paypal.me/…/49" value="${esc(p.paypal_url)}"></div>
       <div class="field"><label>קובץ דיגיטלי להורדה (פרטי — נמסר רק אחרי אישור תשלום)</label>
@@ -342,6 +347,8 @@ function productForm(p) {
     const body = Object.fromEntries(fd)
     body.includes = String(body.includes || '').split('\n').map((x) => x.trim()).filter(Boolean)
     body.active = fd.has('active')
+    body.images = [0, 1, 2, 3, 4].map((i) => String(body['images_' + i] || '').trim()).filter(Boolean)
+    for (let i = 0; i < 5; i++) delete body['images_' + i]
     const id = e.target.dataset.id
     await api(id ? 'PUT' : 'POST', id ? `/products/${id}` : '/products', body)
     toast('נשמר ✓')
