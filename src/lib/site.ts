@@ -1,4 +1,4 @@
-import type { Design } from './validate'
+import { parseVideo, type Design } from './validate'
 
 type ProductRow = {
   slug: string
@@ -12,6 +12,8 @@ type ProductRow = {
   rating: number
   reviews: number
   image_url: string
+  images?: string | null
+  video_url?: string | null
   short_description: string
   description: string
   includes: string
@@ -20,6 +22,19 @@ type ProductRow = {
   cover_from: string
   cover_to: string
   paypal_url: string
+}
+
+function parseImages(raw: string | null | undefined): string[] {
+  try {
+    const v = JSON.parse(raw || '[]')
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 5) : []
+  } catch {
+    return []
+  }
+}
+
+function videoOf(p: ProductRow) {
+  return parseVideo(p.video_url)
 }
 
 const DEFAULT_SECTIONS = [
@@ -69,6 +84,8 @@ export async function getSiteData(db: D1Database) {
       rating: p.rating,
       reviews: p.reviews,
       img: p.image_url,
+      images: parseImages(p.images),
+      video: videoOf(p),
       short: p.short_description,
       desc: p.description,
       incl: JSON.parse(p.includes || '[]') as string[],
