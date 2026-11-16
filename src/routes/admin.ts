@@ -139,11 +139,11 @@ admin.get('/dashboard', async (c) => {
 /* -------------------------------------------------------------- products */
 
 type ProductRow = Record<string, unknown> & { includes: string; id: number }
-const shapeProduct = (p: ProductRow) => ({ ...p, includes: JSON.parse(p.includes || '[]') })
+const shapeProduct = (p: ProductRow) => ({ ...p, includes: JSON.parse(p.includes || '[]'), images: JSON.parse((p.images as string) || '[]') })
 
 const PRODUCT_COLS = [
   'slug', 'name', 'short_description', 'description', 'includes', 'price', 'old_price', 'category_id', 'tag', 'tag_type', 'rating',
-  'reviews', 'image_url', 'cover_title', 'cover_sub', 'cover_from', 'cover_to', 'paypal_url', 'file_url', 'file_id', 'active', 'sort_order'
+  'reviews', 'image_url', 'images', 'video_url', 'cover_title', 'cover_sub', 'cover_from', 'cover_to', 'paypal_url', 'file_url', 'file_id', 'active', 'sort_order'
 ] as const
 
 admin.get('/products', async (c) => {
@@ -168,7 +168,7 @@ admin.post('/products', async (c) => {
   const refErr = await validateRefs(c.env.DB, v.category_id, v.file_id)
   if (refErr) return c.json({ success: false, error: refErr }, 400)
   const slug = v.slug ?? `p-${crypto.randomUUID().slice(0, 8)}`
-  const values = { ...v, slug, includes: JSON.stringify(v.includes) }
+  const values = { ...v, slug, includes: JSON.stringify(v.includes), images: JSON.stringify(v.images) }
   try {
     const res = await c.env.DB.prepare(`INSERT INTO products (${PRODUCT_COLS.join(', ')}) VALUES (${PRODUCT_COLS.map(() => '?').join(', ')})`)
       .bind(...PRODUCT_COLS.map((k) => values[k]))
@@ -188,7 +188,7 @@ admin.put('/products/:id', async (c) => {
   if (refErr) return c.json({ success: false, error: refErr }, 400)
   const existing = await c.env.DB.prepare('SELECT slug FROM products WHERE id = ?').bind(c.req.param('id')).first<{ slug: string }>()
   if (!existing) return c.json({ success: false, error: 'המוצר לא נמצא' }, 404)
-  const values = { ...v, slug: v.slug ?? existing.slug, includes: JSON.stringify(v.includes) }
+  const values = { ...v, slug: v.slug ?? existing.slug, includes: JSON.stringify(v.includes), images: JSON.stringify(v.images) }
   try {
     await c.env.DB.prepare(`UPDATE products SET ${PRODUCT_COLS.map((k) => `${k} = ?`).join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
       .bind(...PRODUCT_COLS.map((k) => values[k]), c.req.param('id'))

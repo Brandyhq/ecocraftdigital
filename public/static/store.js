@@ -264,12 +264,59 @@ function shopPage(){
 }
 
 /* ---------- product ---------- */
+/* Mirrors galleryHtml() in src/lib/ssr.ts. */
+const PLAY='<svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true"><circle cx="27" cy="27" r="27" fill="rgba(0,0,0,.55)"/><path d="M22 17l17 10-17 10z" fill="#fff"/></svg>';
+const ARROW='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg>';
+function galleryHtml(p){
+  const slides=[...(p.img?[p.img]:[]),...(p.images||[])];
+  const video=slides.length?p.video:null;
+  if(slides.length<2&&!video)return '';
+  const total=slides.length+(video?1:0);
+  const img=(src,alt,extra,size)=>`<img src="${esc(src)}" alt="${esc(alt)}" width="${size}" height="${size}" ${extra}>`;
+  const sl=slides.map((s,i)=>`<div class="g-slide${i===0?' on':''}">${img(s,`${p.name} - תמונה ${i+1}`,i===0?'fetchpriority="high" decoding="async"':'loading="lazy" decoding="async"',800)}</div>`);
+  if(video)sl.push(`<div class="g-slide g-video" data-kind="${esc(video.kind)}" data-embed="${esc(video.embed)}"><button type="button" class="g-play" aria-label="הפעלת הסרטון">${img(slides[0],'','loading="lazy" decoding="async"',800)}<span class="g-playicon">${PLAY}</span></button></div>`);
+  const th=slides.map((s,i)=>`<button type="button" class="g-thumb${i===0?' on':''}" data-go="${i}" aria-label="תמונה ${i+1}">${img(s,'','loading="lazy"',80)}</button>`);
+  if(video)th.push(`<button type="button" class="g-thumb g-vthumb" data-go="${slides.length}" aria-label="סרטון">${img(slides[0],'','loading="lazy"',80)}<span>${PLAY}</span></button>`);
+  return `<div class="gallery" data-gallery data-n="${total}"><div class="g-stage" role="group" aria-roledescription="carousel" aria-label="גלריית המוצר" tabindex="0">${sl.join('')}
+    <button type="button" class="g-nav g-prev" data-dir="-1" aria-label="הקודם">${ARROW}</button><button type="button" class="g-nav g-next" data-dir="1" aria-label="הבא">${ARROW}</button>
+    <div class="g-count" aria-live="polite"><span class="g-cur">1</span> / ${total}</div></div><div class="g-thumbs">${th.join('')}</div></div>`;
+}
+function initGallery(root){
+  const slides=[...root.querySelectorAll('.g-slide')], thumbs=[...root.querySelectorAll('.g-thumb')], cur=root.querySelector('.g-cur');
+  let i=0;
+  function stopVideo(){slides.forEach(s=>{if(s.classList.contains('g-video')&&s.dataset.playing){s.dataset.playing='';const f=s.querySelector('iframe,video');if(f)f.remove();const b=s.querySelector('.g-play');if(b)b.hidden=false;}});}
+  function go(n){
+    n=(n+slides.length)%slides.length;if(n===i)return;
+    stopVideo();i=n;
+    slides.forEach((s,k)=>s.classList.toggle('on',k===i));
+    thumbs.forEach((t,k)=>{t.classList.toggle('on',k===i);if(k===i)t.setAttribute('aria-current','true');else t.removeAttribute('aria-current');});
+    if(cur)cur.textContent=i+1;
+  }
+  function play(slide){
+    const kind=slide.dataset.kind, src=slide.dataset.embed||'';let el;
+    if(kind==='file'&&/^https:\/\//.test(src)){el=document.createElement('video');el.src=src;el.controls=true;el.autoplay=true;el.playsInline=true;}
+    else if(/^https:\/\/(www\.youtube-nocookie\.com\/embed\/[\w-]{11}|player\.vimeo\.com\/video\/\d+(\?h=\w{6,20})?)$/.test(src)){
+      el=document.createElement('iframe');el.src=src+(src.includes('?')?'&':'?')+'autoplay=1'+(kind==='youtube'?'&rel=0':'');
+      el.allow='autoplay; encrypted-media; picture-in-picture; fullscreen';el.allowFullscreen=true;el.title='סרטון המוצר';
+    } else return;
+    el.className='g-embed';slide.appendChild(el);slide.dataset.playing='1';slide.querySelector('.g-play').hidden=true;
+  }
+  root.classList.add('js');
+  root.querySelectorAll('[data-dir]').forEach(b=>b.onclick=()=>go(i+ +b.dataset.dir));
+  thumbs.forEach(t=>t.onclick=()=>go(+t.dataset.go));
+  const pb=root.querySelector('.g-play');if(pb)pb.onclick=()=>play(pb.closest('.g-slide'));
+  const stage=root.querySelector('.g-stage');
+  stage.addEventListener('keydown',e=>{if(e.target!==stage)return;if(e.key==='ArrowLeft'){go(i+1);e.preventDefault();}else if(e.key==='ArrowRight'){go(i-1);e.preventDefault();}});
+  let x0=null;
+  stage.addEventListener('touchstart',e=>{x0=e.touches[0].clientX;},{passive:true});
+  stage.addEventListener('touchend',e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(dx)>40)go(dx<0?i+1:i-1);},{passive:true});
+}
 function productPage(id){
   const p=findP(id);if(!p)return shopPage();
   return `<main><div class="wrap" style="padding-top:26px">
     <div class="crumb"><a data-nav="home">בית</a> › <a data-nav="shop">חנות</a> › ${esc(p.name)}</div>
     <div class="pd">
-      <div class="pd-media">${p.img?`<img src="${p.img}" alt="${esc(p.name)}">`:`<div class="gen-cover-wrap">${coverFor(p)}</div>`}</div>
+      <div class="pd-media">${galleryHtml(p)||(p.img?`<img src="${p.img}" alt="${esc(p.name)}">`:`<div class="gen-cover-wrap">${coverFor(p)}</div>`)}</div>
       <div>
         <div style="color:var(--rose);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-size:12.5px;margin-bottom:8px">${esc(p.catName||catName(p.cat))}</div>
         <h1>${esc(p.name)}</h1>
@@ -323,8 +370,8 @@ function checkoutPage(){
       <div class="field"><label for="coName">שם מלא</label><input type="text" id="coName" autocomplete="name" placeholder="השם שלך" maxlength="120"></div>
       <div class="field"><label for="coEmail">כתובת אימייל</label><input type="email" id="coEmail" autocomplete="email" placeholder="name@example.com" maxlength="200"></div>
       <div class="field"><label for="coPhone">טלפון (לא חובה)</label><input type="tel" id="coPhone" autocomplete="tel" placeholder="050-0000000" maxlength="30"></div></div>
-    <div class="co-card"><h3><span class="step-n">2</span> תשלום ב-PayPal</h3>
-      <p class="co-sub">אחרי שליחת ההזמנה תקבלי קישור תשלום מאובטח ב-PayPal. הקובץ נשלח לאימייל ברגע שהתשלום מאושר.</p>
+    <div class="co-card"><h3><span class="step-n">2</span> תשלום</h3>
+      <p class="co-sub">אחרי שליחת ההזמנה יוצג מספר ההזמנה וכפתורי התשלום. הקובץ נשלח לאימייל לאחר שנאשר ידנית את קבלת התשלום.</p>
       <div class="pay-lines">${items.map(({p,q})=>`<div class="pay-line"><div class="pl-info"><div class="pi">${esc(p.name)}</div><div class="pd-note">${money(p.price)}${q>1?' × '+q:''}</div></div></div>`).join('')}</div>
     </div>
   </div>
@@ -346,18 +393,20 @@ function successPage(){
     <div style="margin-top:22px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><button class="btn btn-ghost" data-nav="shop">להמשך קנייה</button><button class="btn btn-ghost" data-nav="home">לדף הבית</button></div>
   </div></div></main>`;
   if(!o)return `<main><div class="wrap"><div class="success"><h1>לא נמצאה הזמנה</h1><div style="margin-top:26px"><button class="btn btn-primary" data-nav="shop">לחנות</button></div></div></div></main>`;
+  const bit=DATA.design.bitUrl||'';
   const rows=o.items.map(i=>`
     <div class="dl-row"><div class="dl-info"><h4>${esc(i.name)}${i.quantity>1?' × '+i.quantity:''}</h4>
       ${i.paypalUrl
         ?`<a class="btn btn-primary btn-sm" href="${esc(i.paypalUrl)}" target="_blank" rel="noopener">תשלום ${money(i.price*i.quantity)} ב-PayPal</a>`
-        :`<span class="dl-pending">קישור התשלום יישלח אלייך באימייל</span>`}
+        :''}
     </div></div>`).join('');
   return `<main><div class="wrap"><div class="success">
     <div class="checkwrap">${iconCheck()}</div>
     <h1>ההזמנה התקבלה!</h1><p>מספר הזמנה: <b>#${esc(o.id)}</b> · סה"כ ${money(o.total)}</p>
-    <p>כדי להשלים את הרכישה, שלמי דרך PayPal. ברגע שנאשר את התשלום נשלח את הקובץ לאימייל <b>${esc(o.email)}</b>.</p>
-    <div class="dl-list">${rows}</div>
-    <p style="font-size:13.5px;color:var(--ink-soft);margin-top:18px">בפרטי התשלום ב-PayPal צייני את מספר ההזמנה #${esc(o.id)}.</p>
+    <p>כדי להשלים את הרכישה, שלמי <b>${money(o.total)}</b> באחת מהדרכים. לאחר שנאשר את קבלת התשלום (ידנית, בדרך כלל בתוך יום עסקים) נשלח את הקובץ לאימייל <b>${esc(o.email)}</b>.</p>
+    <div class="dl-list">${bit?`<div class="dl-row"><div class="dl-info"><h4>תשלום ב-Bit</h4><a class="btn btn-primary btn-sm" href="${esc(bit)}" target="_blank" rel="noopener">לתשלום ${money(o.total)} ב-Bit</a></div></div>`:''}${rows}</div>
+    ${bit||o.items.some(i=>i.paypalUrl)?'':`<p class="dl-pending">פרטי התשלום יישלחו אלייך באימייל <b>${esc(o.email)}</b>.</p>`}
+    <p style="font-size:13.5px;color:var(--ink-soft);margin-top:18px"><b>חשוב:</b> סכום התשלום הוא ${money(o.total)}. בהערה לתשלום כתבי את מספר ההזמנה #${esc(o.id)}, כדי שנוכל לזהות אותו.</p>
     <div style="margin-top:26px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><button class="btn btn-primary" data-nav="shop">להמשך קנייה</button><button class="btn btn-ghost" data-nav="home">לדף הבית</button></div>
   </div></div></main>`;
 }
@@ -413,6 +462,7 @@ function bind(){
   app.querySelectorAll('[data-inc]').forEach(el=>el.onclick=()=>{setQty(el.dataset.inc,(cart[el.dataset.inc]||0)+1);render();});
   app.querySelectorAll('[data-dec]').forEach(el=>el.onclick=()=>{setQty(el.dataset.dec,(cart[el.dataset.dec]||0)-1);render();});
   app.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{delete cart[el.dataset.remove];saveCart();render();});
+  app.querySelectorAll('[data-gallery]').forEach(initGallery);
   const b=document.getElementById('burger');if(b)b.onclick=()=>document.getElementById('navlinks').classList.toggle('open');
   const po=document.getElementById('placeOrder');if(po)po.onclick=async()=>{
     if(placing)return;

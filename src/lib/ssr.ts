@@ -179,9 +179,31 @@ export function contactBody(site: Site) {
   return staticBody(site, 'צור קשר', html)
 }
 
+/** Gallery slides: the main image first, then the extra images. A video needs at least one image to use as its poster. */
+export const gallerySlides = (p: Product) => [...(p.img ? [p.img] : []), ...p.images]
+
+const PLAY = '<svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true"><circle cx="27" cy="27" r="27" fill="rgba(0,0,0,.55)"/><path d="M22 17l17 10-17 10z" fill="#fff"/></svg>'
+const ARROW = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg>'
+
+/** Same markup as galleryHtml() in public/static/store.js. Returns '' when the product has nothing to browse (single image, no video). */
+function galleryHtml(p: Product) {
+  const slides = gallerySlides(p)
+  const video = slides.length ? p.video : null
+  if (slides.length < 2 && !video) return ''
+  const total = slides.length + (video ? 1 : 0)
+  const img = (src: string, alt: string, extra: string, size: number) => `<img src="${e(src)}" alt="${e(alt)}" width="${size}" height="${size}" ${extra}>`
+  const slideHtml = slides.map((s, i) => `<div class="g-slide${i === 0 ? ' on' : ''}">${img(s, `${p.name} - תמונה ${i + 1}`, i === 0 ? 'fetchpriority="high" decoding="async"' : 'loading="lazy" decoding="async"', 800)}</div>`)
+  if (video) slideHtml.push(`<div class="g-slide g-video" data-kind="${e(video.kind)}" data-embed="${e(video.embed)}"><button type="button" class="g-play" aria-label="הפעלת הסרטון">${img(slides[0], '', 'loading="lazy" decoding="async"', 800)}<span class="g-playicon">${PLAY}</span></button></div>`)
+  const thumbs = slides.map((s, i) => `<button type="button" class="g-thumb${i === 0 ? ' on' : ''}" data-go="${i}" aria-label="תמונה ${i + 1}">${img(s, '', 'loading="lazy"', 80)}</button>`)
+  if (video) thumbs.push(`<button type="button" class="g-thumb g-vthumb" data-go="${slides.length}" aria-label="סרטון">${img(slides[0], '', 'loading="lazy"', 80)}<span>${PLAY}</span></button>`)
+  return `<div class="gallery" data-gallery data-n="${total}"><div class="g-stage" role="group" aria-roledescription="carousel" aria-label="גלריית המוצר" tabindex="0">${slideHtml.join('')}
+    <button type="button" class="g-nav g-prev" data-dir="-1" aria-label="הקודם">${ARROW}</button><button type="button" class="g-nav g-next" data-dir="1" aria-label="הבא">${ARROW}</button>
+    <div class="g-count" aria-live="polite"><span class="g-cur">1</span> / ${total}</div></div><div class="g-thumbs">${thumbs.join('')}</div></div>`
+}
+
 export function productBody(site: Site, p: Product) {
   const d = site.design as Design
-  const media = p.img ? `<img src="${e(p.img)}" alt="${e(p.name)}">` : `<div class="gen-cover-wrap"><div class="gen-cover" style="background:linear-gradient(135deg,${e(p.coverFrom || '#6E8767')},${e(p.coverTo || '#4F634A')})"><div><div class="gc-inner">${e(p.coverTitle || p.name)}</div></div></div></div>`
+  const media = galleryHtml(p) || (p.img ? `<img src="${e(p.img)}" alt="${e(p.name)}">` : `<div class="gen-cover-wrap"><div class="gen-cover" style="background:linear-gradient(135deg,${e(p.coverFrom || '#6E8767')},${e(p.coverTo || '#4F634A')})"><div><div class="gc-inner">${e(p.coverTitle || p.name)}</div></div></div></div>`)
   return (
     header(d, 'shop') +
     `<main><div class="wrap" style="padding-top:26px"><nav class="crumb" aria-label="breadcrumb"><a href="/" data-nav="home">בית</a> › <a href="/shop" data-nav="shop">חנות</a> › ${e(p.name)}</nav>
@@ -247,15 +269,28 @@ export function organizationLd(site: Site, origin: string) {
   }
 }
 
+function videoLd(p: Product, origin: string) {
+  const v = p.video!
+  return {
+    '@type': 'VideoObject',
+    name: `${p.name} - סרטון`,
+    description: p.short || p.desc || p.name,
+    thumbnailUrl: [v.thumb || abs(origin, gallerySlides(p)[0])],
+    ...(v.kind === 'file' ? { contentUrl: v.url } : { embedUrl: v.embed })
+  }
+}
+
 export function productLd(site: Site, p: Product, origin: string) {
   const d = site.design as Design
+  const video = gallerySlides(p).length ? p.video : null
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: p.name,
     description: p.short || p.desc,
     sku: p.id,
-    ...(p.img ? { image: abs(origin, p.img) } : {}),
+    ...(gallerySlides(p).length ? { image: gallerySlides(p).map((u) => ({ '@type': 'ImageObject', contentUrl: abs(origin, u), url: abs(origin, u) })) } : {}),
+    ...(video ? { video: videoLd(p, origin) } : {}),
     brand: { '@type': 'Brand', name: d.brandName },
     offers: { '@type': 'Offer', url: `${origin}/product/${encodeURIComponent(p.id)}`, price: String(p.price), priceCurrency: 'ILS', availability: 'https://schema.org/InStock' },
     // Only real reviews are ever published.

@@ -1,4 +1,4 @@
-import type { Design } from './validate'
+import { parseVideo, type Design } from './validate'
 
 type ProductRow = {
   slug: string
@@ -12,6 +12,8 @@ type ProductRow = {
   rating: number
   reviews: number
   image_url: string
+  images?: string | null
+  video_url?: string | null
   short_description: string
   description: string
   includes: string
@@ -22,6 +24,19 @@ type ProductRow = {
   paypal_url: string
   file_url: string
   file_id: string | null
+}
+
+function parseImages(raw: string | null | undefined): string[] {
+  try {
+    const v = JSON.parse(raw || '[]')
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 5) : []
+  } catch {
+    return []
+  }
+}
+
+function videoOf(p: ProductRow) {
+  return parseVideo(p.video_url)
 }
 
 /** Default home hero copy; stored values (editable in the back office) win, these fill empty fields only. */
@@ -108,6 +123,8 @@ export async function getSiteData(db: D1Database) {
       rating: p.rating,
       reviews: p.reviews,
       img: p.image_url,
+      images: parseImages(p.images),
+      video: videoOf(p),
       short: p.short_description,
       desc: p.description,
       incl: JSON.parse(p.includes || '[]') as string[],
