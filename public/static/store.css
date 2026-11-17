@@ -151,7 +151,8 @@ section.block{padding:56px 0}
 .gallery.js .g-zoomhint{display:block}
 .g-nav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:color-mix(in srgb,var(--card) 94%,transparent);color:var(--ink);place-items:center;cursor:pointer;padding:0;z-index:6;box-shadow:0 4px 12px rgba(58,56,47,.1);transition:.18s}
 .g-nav:hover{border-color:var(--sage);color:var(--sage-deep)}
-.g-prev{inset-inline-start:auto;inset-inline-end:12px}.g-next{inset-inline-end:auto;inset-inline-start:12px}
+/* RTL: slides advance leftwards, so next sits on the left (inline-end) and previous on the right (inline-start) */
+.g-prev{inset-inline-start:12px}.g-next{inset-inline-end:12px}
 .g-prev svg{transform:none}.g-next svg{transform:scaleX(-1)}
 .g-count{position:absolute;bottom:14px;inset-inline-start:14px;direction:ltr;background:rgba(58,56,47,.55);color:#fff;font-size:12px;padding:3px 10px;border-radius:999px;letter-spacing:.4px;z-index:5}
 .g-zoomhint{position:absolute;top:14px;inset-inline-end:14px;background:color-mix(in srgb,var(--card) 94%,transparent);border:1px solid var(--line);color:var(--ink-soft);font-size:12px;padding:5px 11px;border-radius:999px;z-index:5;pointer-events:none}
