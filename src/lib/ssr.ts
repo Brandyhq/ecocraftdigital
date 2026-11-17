@@ -201,15 +201,33 @@ function galleryHtml(p: Product) {
     <div class="g-count" aria-live="polite"><span class="g-cur">1</span> / ${total}</div></div><div class="g-thumbs">${thumbs.join('')}</div></div>`
 }
 
+/** Rows under the CTA. Only statements that are true of the manual payment flow today. Mirrors pdExtras() in store.js. */
+function pdExtras(site: Site, p: Product) {
+  const has = (slug: string) => site.pages.some((x) => x.slug === slug)
+  const about = p.short && p.desc && p.desc !== p.short ? `<div class="pd-block"><h3>על המוצר</h3><p class="pd-desc">${e(p.desc)}</p></div>` : ''
+  const links = [
+    has('refunds') ? `<a href="${pageHref('refunds')}">מדיניות החזרים</a>` : '',
+    has('terms') ? `<a href="${pageHref('terms')}">תנאי שימוש</a>` : '',
+    has('faq') ? `<a href="${pageHref('faq')}">שאלות נפוצות</a>` : '',
+    '<a href="/contact">יצירת קשר</a>'
+  ].join('')
+  return `${p.incl.length ? `<div class="pd-block"><h3>מה מקבלים</h3><ul class="incl">${p.incl.map((i) => `<li>${check}<span>${e(i)}</span></li>`).join('')}</ul></div>` : ''}${about}
+    <div class="pd-block"><h3>איך מקבלים את הקובץ</h3><div class="deliver">
+      <div class="row"><span><b>שולחים הזמנה</b> ומקבלים מספר הזמנה וקישורי תשלום.</span></div>
+      <div class="row"><span><b>אחרי שנאשר את קבלת התשלום</b> נשלח קישור הורדה אישי למייל.</span></div>
+      <div class="row"><span><b>הקישור אישי</b> ואפשר לפתוח אותו מכל מכשיר.</span></div>
+    </div></div><div class="pd-trust">${links}</div>`
+}
+
 export function productBody(site: Site, p: Product) {
   const d = site.design as Design
   const media = galleryHtml(p) || (p.img ? `<img src="${e(p.img)}" alt="${e(p.name)}">` : `<div class="gen-cover-wrap"><div class="gen-cover" style="background:linear-gradient(135deg,${e(p.coverFrom || '#6E8767')},${e(p.coverTo || '#4F634A')})"><div><div class="gc-inner">${e(p.coverTitle || p.name)}</div></div></div></div>`)
   return (
     header(d, 'shop') +
     `<main><div class="wrap" style="padding-top:26px"><nav class="crumb" aria-label="breadcrumb"><a href="/" data-nav="home">בית</a> › <a href="/shop" data-nav="shop">חנות</a> › ${e(p.name)}</nav>
-    <div class="pd"><div class="pd-media">${media}</div><div><div style="color:var(--rose);font-weight:700;font-size:12.5px;margin-bottom:8px">${e(p.catName)}</div>
-    <h1>${e(p.name)}</h1><div class="pd-price">${money(d, p.price)}${p.old ? `<span class="old">${money(d, p.old as number)}</span>` : ''}</div>
-    <p class="pd-desc">${e(p.desc)}</p><ul class="incl">${p.incl.map((i) => `<li>${check}<span>${e(i)}</span></li>`).join('')}</ul></div></div></div></main>` +
+    <div class="pd"><div class="pd-media">${media}</div><div class="pd-info"><div class="pd-cat">${e(p.catName)}</div>
+    <h1>${e(p.name)}</h1><p class="pd-lede">${e(p.short || p.desc)}</p><div class="pd-price">${money(d, p.price)}${p.old ? `<span class="old">${money(d, p.old as number)}</span>` : ''}<small class="pd-fine">קובץ דיגיטלי, תשלום חד־פעמי</small></div>
+    ${pdExtras(site, p)}</div></div></div></main>` +
     footer(site)
   )
 }
