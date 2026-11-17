@@ -277,7 +277,7 @@ function galleryHtml(p){
   if(video)sl.push(`<div class="g-slide g-video" data-kind="${esc(video.kind)}" data-embed="${esc(video.embed)}"><button type="button" class="g-play" aria-label="הפעלת הסרטון">${img(slides[0],'','loading="lazy" decoding="async"',800)}<span class="g-playicon">${PLAY}</span></button></div>`);
   const th=slides.map((s,i)=>`<button type="button" class="g-thumb${i===0?' on':''}" data-go="${i}" aria-label="תמונה ${i+1}">${img(s,'','loading="lazy"',80)}</button>`);
   if(video)th.push(`<button type="button" class="g-thumb g-vthumb" data-go="${slides.length}" aria-label="סרטון">${img(slides[0],'','loading="lazy"',80)}<span>${PLAY}</span></button>`);
-  return `<div class="gallery" data-gallery data-n="${total}"><div class="g-stage" role="group" aria-roledescription="carousel" aria-label="גלריית המוצר" tabindex="0">${sl.join('')}
+  return `<div class="gallery" data-gallery data-n="${total}"><div class="g-stage" role="group" aria-roledescription="carousel" aria-label="גלריית המוצר" tabindex="0">${sl.join('')}<div class="g-zoomhint">לחיצה על תמונה להגדלה</div>
     <button type="button" class="g-nav g-prev" data-dir="-1" aria-label="הקודם">${ARROW}</button><button type="button" class="g-nav g-next" data-dir="1" aria-label="הבא">${ARROW}</button>
     <div class="g-count" aria-live="polite"><span class="g-cur">1</span> / ${total}</div></div><div class="g-thumbs">${th.join('')}</div></div>`;
 }
@@ -301,6 +301,14 @@ function initGallery(root){
     } else return;
     el.className='g-embed';slide.appendChild(el);slide.dataset.playing='1';slide.querySelector('.g-play').hidden=true;
   }
+  function openZoom(src){
+    const z=document.createElement('div');z.className='zoom';z.setAttribute('role','dialog');z.setAttribute('aria-modal','true');z.setAttribute('aria-label','תמונה מוגדלת');
+    z.innerHTML='<button type="button" class="zoom-x" aria-label="סגירה">✕</button><img alt="">';z.querySelector('img').src=src;
+    const close=()=>{z.remove();document.removeEventListener('keydown',onKey);stage.focus();};
+    const onKey=e=>{if(e.key==='Escape')close();};
+    z.onclick=close;document.addEventListener('keydown',onKey);document.body.appendChild(z);z.querySelector('.zoom-x').focus();
+  }
+  root.querySelectorAll('.g-slide:not(.g-video) img').forEach(im=>{im.onclick=()=>openZoom(im.currentSrc||im.src);});
   root.classList.add('js');
   root.querySelectorAll('[data-dir]').forEach(b=>b.onclick=()=>go(i+ +b.dataset.dir));
   thumbs.forEach(t=>t.onclick=()=>go(+t.dataset.go));
@@ -311,27 +319,45 @@ function initGallery(root){
   stage.addEventListener('touchstart',e=>{x0=e.touches[0].clientX;},{passive:true});
   stage.addEventListener('touchend',e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;x0=null;if(Math.abs(dx)>40)go(dx<0?i+1:i-1);},{passive:true});
 }
+/* Mirrors pdExtras() in src/lib/ssr.ts. Only statements that are true of the manual payment flow today. */
+function pdExtras(p){
+  const has=slug=>(DATA.pages||[]).some(x=>x.slug===slug);
+  const incl=p.incl||[];
+  const about=p.short&&p.desc&&p.desc!==p.short?`<div class="pd-block"><h3>על המוצר</h3><p class="pd-desc">${esc(p.desc)}</p></div>`:'';
+  const links=[has('refunds')?`<a href="${pageHref('refunds')}">מדיניות החזרים</a>`:'',has('terms')?`<a href="${pageHref('terms')}">תנאי שימוש</a>`:'',has('faq')?`<a href="${pageHref('faq')}">שאלות נפוצות</a>`:'','<a href="/contact">יצירת קשר</a>'].join('');
+  return `${incl.length?`<div class="pd-block"><h3>מה מקבלים</h3><ul class="incl">${incl.map(i=>`<li>${iconCheck()}<span>${esc(i)}</span></li>`).join('')}</ul></div>`:''}${about}
+    <div class="pd-block"><h3>איך מקבלים את הקובץ</h3><div class="deliver">
+      <div class="row"><span><b>שולחים הזמנה</b> ומקבלים מספר הזמנה וקישורי תשלום.</span></div>
+      <div class="row"><span><b>אחרי שנאשר את קבלת התשלום</b> נשלח קישור הורדה אישי למייל.</span></div>
+      <div class="row"><span><b>הקישור אישי</b> ואפשר לפתוח אותו מכל מכשיר.</span></div>
+    </div></div><div class="pd-trust">${links}</div>`;
+}
+function payLine(p){
+  const tags=[DATA.design.bitUrl?'Bit':'',p.paypalUrl?'PayPal':''].filter(Boolean);
+  return tags.length?`<div class="payrow">אחרי שליחת ההזמנה אפשר לשלם ב: ${tags.map(t=>`<span class="tag">${t}</span>`).join(' ')}</div>`:`<div class="payrow">פרטי התשלום יישלחו באימייל אחרי שליחת ההזמנה</div>`;
+}
 function productPage(id){
   const p=findP(id);if(!p)return shopPage();
   return `<main><div class="wrap" style="padding-top:26px">
-    <div class="crumb"><a data-nav="home">בית</a> › <a data-nav="shop">חנות</a> › ${esc(p.name)}</div>
+    <div class="crumb"><a data-nav="home">בית</a> › <a data-nav="shop">חנות</a> › ${p.cat?`<a data-cat="${esc(p.cat)}">${esc(p.catName||catName(p.cat))}</a> › `:''}${esc(p.name)}</div>
     <div class="pd">
       <div class="pd-media">${galleryHtml(p)||(p.img?`<img src="${p.img}" alt="${esc(p.name)}">`:`<div class="gen-cover-wrap">${coverFor(p)}</div>`)}</div>
-      <div>
-        <div style="color:var(--rose);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-size:12.5px;margin-bottom:8px">${esc(p.catName||catName(p.cat))}</div>
+      <div class="pd-info">
+        <div class="pd-cat">${esc(p.catName||catName(p.cat))}</div>
         <h1>${esc(p.name)}</h1>
         ${p.reviews>0?`<div class="stars">${stars(p.rating)} <small>${p.rating||''} · ${p.reviews} ביקורות</small></div>`:''}
-        <div class="pd-price">${money(p.price)}${p.old?`<span class="old">${money(p.old)}</span>`:''}</div>
-        <p class="pd-desc">${esc(p.desc)}</p>
-        <ul class="incl">${(p.incl||[]).map(i=>`<li>${iconCheck()}<span>${esc(i)}</span></li>`).join('')}</ul>
+        <p class="pd-lede">${esc(p.short||p.desc)}</p>
+        <div class="pd-price">${money(p.price)}${p.old?`<span class="old">${money(p.old)}</span>`:''}<small class="pd-fine">קובץ דיגיטלי, תשלום חד־פעמי</small></div>
         <div class="pd-cta"><button class="btn btn-primary" data-add="${p.id}">הוספה לעגלה · ${money(p.price)}</button>
           <button class="btn btn-rose" data-buy="${p.id}">קנייה מהירה</button></div>
-        <div class="note-box" style="margin-top:20px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>מוצר דיגיטלי — לאחר התשלום מקבלים קישור הורדה מיידי וגם עותק למייל. אין צורך בכתובת למשלוח.</span></div>
+        ${payLine(p)}
+        ${pdExtras(p)}
       </div>
     </div>
     <section class="block"><div class="sec-head" style="margin-bottom:26px"><h2 style="font-size:28px;color:var(--sage-deep)">אולי יעניין אותך גם</h2></div>
       <div class="grid">${P().filter(x=>x.id!==p.id).slice(0,3).map(cardHTML).join('')}</div></section>
-  </div></main>`;
+  </div>
+  <div class="mobilebar"><div class="mb-price">${money(p.price)}</div><button class="btn btn-primary" data-add="${p.id}">הוספה לעגלה</button></div></main>`;
 }
 
 /* ---------- cart ---------- */
@@ -403,7 +429,7 @@ function successPage(){
   return `<main><div class="wrap"><div class="success">
     <div class="checkwrap">${iconCheck()}</div>
     <h1>ההזמנה התקבלה!</h1><p>מספר הזמנה: <b>#${esc(o.id)}</b> · סה"כ ${money(o.total)}</p>
-    <p>כדי להשלים את הרכישה, שלמי <b>${money(o.total)}</b> באחת מהדרכים. לאחר שנאשר את קבלת התשלום (ידנית, בדרך כלל בתוך יום עסקים) נשלח את הקובץ לאימייל <b>${esc(o.email)}</b>.</p>
+    <p>כדי להשלים את הרכישה, שלמי <b>${money(o.total)}</b> באחת מהדרכים. לאחר שנאשר ידנית את קבלת התשלום נשלח את הקובץ לאימייל <b>${esc(o.email)}</b>.</p>
     <div class="dl-list">${bit?`<div class="dl-row"><div class="dl-info"><h4>תשלום ב-Bit</h4><a class="btn btn-primary btn-sm" href="${esc(bit)}" target="_blank" rel="noopener">לתשלום ${money(o.total)} ב-Bit</a></div></div>`:''}${rows}</div>
     ${bit||o.items.some(i=>i.paypalUrl)?'':`<p class="dl-pending">פרטי התשלום יישלחו אלייך באימייל <b>${esc(o.email)}</b>.</p>`}
     <p style="font-size:13.5px;color:var(--ink-soft);margin-top:18px"><b>חשוב:</b> סכום התשלום הוא ${money(o.total)}. בהערה לתשלום כתבי את מספר ההזמנה #${esc(o.id)}, כדי שנוכל לזהות אותו.</p>
@@ -463,6 +489,7 @@ function bind(){
   app.querySelectorAll('[data-dec]').forEach(el=>el.onclick=()=>{setQty(el.dataset.dec,(cart[el.dataset.dec]||0)-1);render();});
   app.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{delete cart[el.dataset.remove];saveCart();render();});
   app.querySelectorAll('[data-gallery]').forEach(initGallery);
+  document.body.classList.toggle('has-mbar',!!app.querySelector('.mobilebar'));
   const b=document.getElementById('burger');if(b)b.onclick=()=>document.getElementById('navlinks').classList.toggle('open');
   const po=document.getElementById('placeOrder');if(po)po.onclick=async()=>{
     if(placing)return;
