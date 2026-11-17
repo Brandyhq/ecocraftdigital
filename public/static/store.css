@@ -105,7 +105,7 @@ section.block{padding:56px 0}
 .card .thumb img{width:100%;height:100%;object-fit:cover;transition:.4s}
 .card:hover .thumb img{transform:scale(1.05)}
 .card-tag{position:absolute;top:12px;inset-inline-start:12px;background:var(--rose);color:var(--ink);font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;z-index:2}
-.card-tag.sage{background:var(--sage)}
+.card-tag.sage{background:var(--sage);color:var(--cream)}
 .gen-cover{width:100%;height:100%;display:grid;place-items:center;text-align:center;padding:22px}
 .gen-cover .gc-inner{font-family:var(--hfont),serif;font-weight:900;font-size:26px;line-height:1.2;color:#fff}
 .gen-cover small{display:block;font-family:"Assistant";font-weight:600;font-size:13px;letter-spacing:1px;margin-top:8px;opacity:.9}

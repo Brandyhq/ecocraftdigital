@@ -207,7 +207,7 @@ export function productBody(site: Site, p: Product) {
   return (
     header(d, 'shop') +
     `<main><div class="wrap" style="padding-top:26px"><nav class="crumb" aria-label="breadcrumb"><a href="/" data-nav="home">בית</a> › <a href="/shop" data-nav="shop">חנות</a> › ${e(p.name)}</nav>
-    <div class="pd"><div class="pd-media">${media}</div><div><div style="color:var(--rose);font-weight:700;font-size:12.5px;margin-bottom:8px">${e(p.catName)}</div>
+    <div class="pd"><div class="pd-media">${media}</div><div><div style="color:var(--blush-deep);font-weight:700;font-size:12.5px;margin-bottom:8px">${e(p.catName)}</div>
     <h1>${e(p.name)}</h1><div class="pd-price">${money(d, p.price)}${p.old ? `<span class="old">${money(d, p.old as number)}</span>` : ''}</div>
     <p class="pd-desc">${e(p.desc)}</p><ul class="incl">${p.incl.map((i) => `<li>${check}<span>${e(i)}</span></li>`).join('')}</ul></div></div></div></main>` +
     footer(site)

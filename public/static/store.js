@@ -300,7 +300,7 @@ function productPage(id){
     <div class="pd">
       <div class="pd-media">${galleryHtml(p)||(p.img?`<img src="${p.img}" alt="${esc(p.name)}">`:`<div class="gen-cover-wrap">${coverFor(p)}</div>`)}</div>
       <div>
-        <div style="color:var(--rose);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;font-size:12.5px;margin-bottom:8px">${esc(p.catName||catName(p.cat))}</div>
+        <div style="color:var(--blush-deep);font-weight:700;font-size:12.5px;margin-bottom:8px">${esc(p.catName||catName(p.cat))}</div>
         <h1>${esc(p.name)}</h1>
         ${p.reviews>0?`<div class="stars">${stars(p.rating)} <small>${p.rating||''} · ${p.reviews} ביקורות</small></div>`:''}
         <div class="pd-price">${money(p.price)}${p.old?`<span class="old">${money(p.old)}</span>`:''}</div>
@@ -500,9 +500,9 @@ if(document.body.dataset.static){
         name:document.getElementById('ctName').value,email:document.getElementById('ctEmail').value,orderRef:document.getElementById('ctRef').value,
         message:document.getElementById('ctMsg').value,website:document.getElementById('ctWebsite').value})});
       const data=await res.json().catch(()=>({}));
-      if(!res.ok||!data.success){out.textContent=data.error||'לא הצלחנו לשלוח, נסי שוב';out.style.color='var(--rose)';btn.disabled=false;return;}
+      if(!res.ok||!data.success){out.textContent=data.error||'לא הצלחנו לשלוח, נסי שוב';out.style.color='var(--blush-deep)';btn.disabled=false;return;}
       cf.reset();out.textContent='תודה! ההודעה נשלחה ונחזור אלייך בהקדם 💚';
-    }catch(err){out.textContent='לא הצלחנו לשלוח, נסי שוב';out.style.color='var(--rose)';btn.disabled=false;}
+    }catch(err){out.textContent='לא הצלחנו לשלוח, נסי שוב';out.style.color='var(--blush-deep)';btn.disabled=false;}
   };
 }else{
   render();
