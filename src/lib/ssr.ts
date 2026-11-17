@@ -7,9 +7,9 @@ type Product = Site['products'][number]
 type Design = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const FONTS =
-  'https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Assistant:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Heebo:wght@400;500;700;900&display=swap'
+  'https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Assistant:wght@300;400;500;600;700&family=Heebo:wght@400;500;700;900&display=swap'
 
-const money = (d: Design, n: number) => `${d.currency || '₪'}${n}`
+const money = (d: Design, n: number) => `${n}${d.currency || '₪'}`
 const abs = (origin: string, url: string) => (/^https?:\/\//.test(url) ? url : origin + url)
 const check = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
 const ICONS: Record<string, string> = {
@@ -29,7 +29,7 @@ const feat = (f: Design) =>
 function header(d: Design, active: string) {
   const links: [string, string, string][] = [['home', '/', 'בית'], ['shop', '/shop', 'חנות'], ['about', '/about', 'עלינו']]
   return `<header><div class="wrap"><nav class="nav">
-    <a class="logo" href="/" data-nav="home"><div class="mark">${e(d.logoText || 'ED')}</div><div class="name">${e(d.brandName)}<small>${e(d.brandSub || '')}</small></div></a>
+    <a class="logo" href="/" data-nav="home"><img class="logo-img" src="/static/img/ecocraftdigital-logo.png" alt="${e(d.brandName)}" width="64" height="64"></a>
     <div class="nav-links" id="navlinks">${links.map(([id, href, label]) => `<a href="${href}" data-nav="${id}" class="${active === id ? 'active' : ''}">${label}</a>`).join('')}</div>
     <div class="nav-icons"><button class="icon-btn hamburger" id="burger" aria-label="תפריט"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><a class="icon-btn" href="/cart" data-nav="cart" aria-label="עגלה">${cartIcon}</a></div>
   </nav></div></header>`
@@ -61,7 +61,7 @@ function footer(site: Site) {
     d.contactEmail ? `<a href="mailto:${e(d.contactEmail)}">${e(d.contactEmail)}</a>` : ''
   ].filter(Boolean)
   return `<footer><div class="wrap"><div class="foot-grid">
-    <div><a class="logo" href="/" data-nav="home" style="margin-bottom:14px"><div class="mark">${e(d.logoText || 'ED')}</div><div class="name">${e(d.brandName)}<small>${e(d.brandSub || '')}</small></div></a><p>${e(d.footerTagline || '')}</p></div>
+    <div><a class="logo" href="/" data-nav="home" style="margin-bottom:14px"><img class="logo-img" src="/static/img/ecocraftdigital-logo.png" alt="${e(d.brandName)}" width="64" height="64"></a><p>${e(d.footerTagline || '')}</p></div>
     <div><h5>חנות</h5>${cats.map((c) => `<a href="/shop?cat=${encodeURIComponent(c.id)}" data-cat="${e(c.id)}">${e(c.name)}</a>`).join('')}<a href="/shop" data-nav="shop">כל המוצרים</a></div>
     <div><h5>מידע</h5>${info.join('')}</div>
     ${social.length ? `<div><h5>יצירת קשר</h5>${social.join('')}</div>` : ''}
@@ -246,6 +246,7 @@ ${o.noindex ? '<meta name="robots" content="noindex,follow">' : '<meta name="rob
 ${image ? `<meta property="og:image" content="${e(image)}">` : ''}
 <meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}"><meta name="twitter:title" content="${e(o.title)}"><meta name="twitter:description" content="${e(o.description)}">
 ${(o.jsonld || []).map((j) => `<script type="application/ld+json">${safeJson(j)}</script>`).join('\n')}
+<link rel="icon" type="image/png" href="/static/img/ecocraftdigital-logo.png"><link rel="apple-touch-icon" href="/static/img/ecocraftdigital-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${FONTS}"><link rel="stylesheet" href="/static/store.css">
 </head><body${o.static ? ' data-static="1"' : ''}><div id="app">${o.body}</div><div class="toast" id="toast"></div>
@@ -265,6 +266,7 @@ export function organizationLd(site: Site, origin: string) {
     inLanguage: 'he-IL',
     currenciesAccepted: 'ILS',
     areaServed: 'IL',
+    logo: abs(origin, '/static/img/ecocraftdigital-logo.png'),
     ...(d.heroImg ? { image: abs(origin, d.heroImg) } : {})
   }
 }

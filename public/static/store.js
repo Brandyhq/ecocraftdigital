@@ -22,29 +22,11 @@ function toHex(a){return '#'+a.map(v=>Math.max(0,Math.min(255,Math.round(v))).to
 function mix(a,b,t){const A=hx(a),B=hx(b);return toHex(A.map((v,i)=>v+(B[i]-v)*t));}
 const lighten=(c,t)=>mix(c,'#ffffff',t), darken=(c,t)=>mix(c,'#000000',t);
 
-function genThemeCSS(c){
-  const sage=c.sage,sd=c.sageDeep,rose=c.rose,cream=c.cream,ink=c.ink;
-  const L=`:root{
-    --cream:${cream};--cream-2:${mix(cream,ink,.06)};--card:${lighten(cream,.55)};
-    --sage:${sage};--sage-deep:${sd};--sage-soft:${mix(sage,cream,.55)};
-    --rose:${rose};--rose-soft:${mix(rose,cream,.58)};
-    --ink:${ink};--ink-soft:${mix(ink,cream,.4)};--line:${mix(cream,ink,.14)};
-    --gold:#C9A25A;--good:${sd};--hfont:"${DATA.design.headingFont||'Frank Ruhl Libre'}";}`;
-  const dBg=mix(sd,'#000',.80), dBg2=mix(sd,'#000',.74), dCard=mix(sd,'#000',.70);
-  const D=`{
-    --cream:${dBg};--cream-2:${dBg2};--card:${dCard};
-    --sage:${lighten(sage,.22)};--sage-deep:${lighten(sage,.42)};--sage-soft:${mix(sage,'#000',.5)};
-    --rose:${lighten(rose,.14)};--rose-soft:${mix(rose,'#000',.5)};
-    --ink:${mix(cream,'#fff',.55)};--ink-soft:${mix(cream,dBg,.5)};--line:${mix(sd,'#000',.5)};
-    --gold:#D6B36B;--good:${lighten(sage,.2)};--hfont:"${DATA.design.headingFont||'Frank Ruhl Libre'}";}`;
-  return L
-    +`@media (prefers-color-scheme:dark){:root:not([data-theme="light"])${D}}`
-    +`:root[data-theme="dark"]${D}`;
-}
+/* The palette is fixed by the brand kit (store.css). Only the heading font stays editable in the back office. */
 function applyTheme(){
   let s=document.getElementById('dyn-theme');
   if(!s){s=document.createElement('style');s.id='dyn-theme';document.head.appendChild(s);}
-  s.textContent=genThemeCSS(DATA.design.colors);
+  s.textContent=`:root{--hfont:"${DATA.design.headingFont||'Frank Ruhl Libre'}";}`;
 }
 
 /* ---------- state ---------- */
@@ -59,7 +41,7 @@ function findP(id){return P().find(x=>x.id===id);}
 function cartItems(){return Object.keys(cart).map(id=>({p:findP(id),q:cart[id]})).filter(x=>x.p);}
 function cartTotal(){return cartItems().reduce((a,x)=>a+Number(x.p.price)*x.q,0);}
 function cur(){return DATA.design.currency||'₪';}
-function money(n){return cur()+n;}
+function money(n){return n+cur();}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 function addToCart(id,silent){cart[id]=(cart[id]||0)+1;saveCart();updateCartBadge();if(!silent)toast('נוסף לעגלה ✓');}
@@ -150,8 +132,8 @@ function header(){
   const d=DATA.design;
   const links=[['home','בית'],['shop','חנות'],['about','עלינו']];
   return `<header><div class="wrap"><nav class="nav">
-    <a class="logo" href="/" data-nav="home"><div class="mark">${esc(d.logoText||'ED')}</div>
-      <div class="name">${esc(d.brandName)}<small>${esc(d.brandSub||'')}</small></div></a>
+    <a class="logo" href="/" data-nav="home"><img class="logo-img" src="/static/img/ecocraftdigital-logo.png" alt="${esc(d.brandName)}" width="64" height="64">
+      </a>
     <div class="nav-links" id="navlinks">${links.map(l=>`<a href="${pathFor({name:l[0]})}" data-nav="${l[0]}" class="${route.name===l[0]?'active':''}"${route.name===l[0]?' aria-current="page"':''}>${l[1]}</a>`).join('')}</div>
     <div class="nav-icons">
       <button class="icon-btn hamburger" id="burger" aria-label="תפריט"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
@@ -379,7 +361,7 @@ function checkoutPage(){
     ${items.map(({p,q})=>`<div class="sum-row"><span>${esc(p.name)} ${q>1?'× '+q:''}</span><span>${money(p.price*q)}</span></div>`).join('')}
     <div class="sum-row total"><span>סה"כ לתשלום</span><b>${money(sub)}</b></div>
     <button class="btn btn-primary btn-block" style="margin-top:16px" id="placeOrder">שליחת הזמנה ומעבר לתשלום</button>
-    <p style="text-align:center;font-size:13px;color:var(--ink-soft);margin:12px 0 0">🔒 תשלום מאובטח · הורדה מיידית</p></div>
+    <p style="text-align:center;font-size:13px;color:var(--ink-soft);margin:12px 0 0">תשלום מאובטח · הורדה מיידית</p></div>
   </div></div></main>`;
 }
 
@@ -435,14 +417,13 @@ function contactLinks(d){
 function footer(){
   const d=DATA.design;
   return `<footer><div class="wrap"><div class="foot-grid${contactLinks(d)?' five':''}">
-    <div><div class="logo" data-nav="home" style="margin-bottom:14px"><div class="mark">${esc(d.logoText||'ED')}</div><div class="name">${esc(d.brandName)}<small>${esc(d.brandSub||'')}</small></div></div>
+    <div><div class="logo" data-nav="home" style="margin-bottom:14px"><img class="logo-img" src="/static/img/ecocraftdigital-logo.png" alt="${esc(d.brandName)}" width="64" height="64"></div>
       <p>${esc(d.footerTagline||'')}</p></div>
     <div><h5>חנות</h5>${DATA.categories.filter(c=>c.count>0).map(c=>`<a data-cat="${c.id}">${esc(c.name)}</a>`).join('')}<a data-nav="shop">כל המוצרים</a></div>
     <div><h5>מידע</h5><a href="/about" data-nav="about">עלינו</a>${(DATA.pages||[]).map(p=>`<a href="${pageHref(p.slug)}">${esc(p.title)}</a>`).join('')}<a href="/contact">צור קשר</a></div>
     ${contactLinks(d)?`<div><h5>יצירת קשר</h5>${contactLinks(d)}</div>`:''}
     <div><h5>הישארי מעודכנת</h5><p>קבלי טיפים ומבצעים ישירות למייל.</p><div class="newsletter"><input type="email" placeholder="האימייל שלך"><button class="btn btn-primary" id="subBtn">הרשמה</button></div></div>
   </div><div class="foot-bottom"><span>© 2026 ${esc(d.brandName)} · כל הזכויות שמורות</span>
-    <div class="fb-links"><span id="themeToggle">🌙 מצב כהה / בהיר</span></div>
   </div></div></footer>`;
 }
 
@@ -479,7 +460,6 @@ function bind(){
   };
   const ap=document.getElementById('applyPromo');if(ap)ap.onclick=()=>toast('קוד קופון אינו זמין בהדגמה');
   const sb=document.getElementById('subBtn');if(sb)sb.onclick=()=>toast('נרשמת לרשימת התפוצה ✓');
-  const tt=document.getElementById('themeToggle');if(tt)tt.onclick=toggleTheme;
 }
 function updateCartBadge(){
   const btn=document.querySelector('[data-nav="cart"]');if(!btn)return;
@@ -490,16 +470,9 @@ function updateCartBadge(){
 }
 let toastT;
 function toast(msg,isErr){const t=document.getElementById('toast');t.innerHTML=msg;t.className='toast show'+(isErr?' err':'');clearTimeout(toastT);toastT=setTimeout(()=>t.className='toast',2600);}
-function toggleTheme(){
-  const cur=document.documentElement.getAttribute('data-theme');
-  let next=cur==='dark'?'light':cur==='light'?'dark':(matchMedia('(prefers-color-scheme: dark)').matches?'light':'dark');
-  document.documentElement.setAttribute('data-theme',next);
-  try{localStorage.setItem('ec_theme',next);}catch(e){}
-}
 
 
 /* ---------- boot ---------- */
-(function(){try{const t=localStorage.getItem('ec_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
 if(DATA.design)applyTheme();
 /* returning from PayPal: ?paid=<download token> after a captured payment, ?payment=cancelled|failed|pending otherwise */
 const q=new URLSearchParams(location.search);
