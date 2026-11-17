@@ -362,14 +362,12 @@ const SECTION_NAMES = { featured: 'מוצרים נבחרים', categories: 'קט
 
 function renderDesign() {
   const d = state.cache.design
-  const c = d.colors || {}
   const t = (label, name, val, extra = '') => `<div class="field"><label>${label}</label><input type="text" name="${name}" value="${esc(val ?? '')}" ${extra}></div>`
-  const color = (label, k) => `<div class="field"><label>${label}</label><input type="color" name="color_${k}" value="${esc(c[k] || '#000000')}"></div>`
   main().innerHTML = `<div class="head"><h1>תוכן האתר</h1><span class="grow"></span><a class="btn ghost" href="/" target="_blank" rel="noopener">צפייה באתר ↗</a></div>
   <form id="designForm">
     <div class="card"><h3>מותג</h3><div class="row">${t('שם החנות', 'brandName', d.brandName)}${t('תת-כותרת', 'brandSub', d.brandSub)}${t('אותיות לוגו', 'logoText', d.logoText, 'maxlength="4"')}${t('סימן מטבע', 'currency', d.currency, 'maxlength="4"')}
       <div class="field"><label>גופן כותרות</label><select name="headingFont">${['Frank Ruhl Libre', 'Assistant', 'Heebo'].map((f) => `<option ${d.headingFont === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div></div>
-      <div class="row">${color('ירוק', 'sage')}${color('ירוק עמוק', 'sageDeep')}${color('ורוד', 'rose')}${color('רקע', 'cream')}${color('טקסט', 'ink')}</div></div>
+      <p class="hint">הצבעים נקבעים לפי ערכת המיתוג ואינם ניתנים לעריכה כאן.</p></div>
     <div class="card"><h3>באנר ראשי</h3><div class="row">
       <div class="field"><label>סגנון</label><select name="heroStyle">${[['side', 'תמונה בצד'], ['center', 'ממורכז'], ['bg', 'תמונת רקע']].map(([k, v]) => `<option value="${k}" ${d.heroStyle === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       ${t('שורה עליונה', 'heroEyebrow', d.heroEyebrow)}${t('כותרת', 'heroTitle', d.heroTitle)}${t('כותרת משנה (אנגלית)', 'heroSubtitle', d.heroSubtitle)}${t('תגית בתמונה', 'heroBadge', d.heroBadge)}${t('תת-תגית', 'heroBadgeSub', d.heroBadgeSub)}</div>
@@ -415,7 +413,6 @@ function readDesign() {
   const fd = new FormData(form)
   const d = { ...state.cache.design }
   for (const k of ['brandName', 'brandSub', 'logoText', 'currency', 'headingFont', 'heroStyle', 'heroEyebrow', 'heroTitle', 'heroSubtitle', 'heroBadge', 'heroBadgeSub', 'heroLead', 'heroImg', 'featuredTitle', 'featuredSub', 'aboutTitle', 'aboutText', 'aboutImg', 'footerTagline', 'contactEmail', 'contactPhone', 'whatsappUrl', 'instagramUrl', 'bitUrl', 'businessName', 'businessId']) d[k] = fd.get(k) ?? ''
-  d.colors = Object.fromEntries(['sage', 'sageDeep', 'rose', 'cream', 'ink'].map((k) => [k, fd.get('color_' + k)]))
   d.trust = String(fd.get('trust') || '').split('\n').map((x) => x.trim()).filter(Boolean)
   d.featuredIds = fd.getAll('featured')
   d.homeSections = (d.homeSections || []).map((s) => ({ id: s.id, on: !!form.querySelector(`[data-section="${s.id}"]`)?.checked }))
