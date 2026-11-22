@@ -182,7 +182,7 @@ const views = {
   pages: guard(async function () {
     const { pages } = await api('GET', '/pages')
     state.cache.pages = pages
-    const SYS = ['faq', 'terms', 'privacy', 'refunds']
+    const SYS = ['faq', 'terms', 'privacy', 'refunds', 'accessibility']
     const href = (p) => (SYS.includes(p.slug) ? '/' + p.slug : '/page/' + p.slug)
     main().innerHTML = `<div class="head"><h1>עמודים</h1><span class="grow"></span><button class="btn primary" data-act="pageNew">+ עמוד חדש</button></div>
       <p class="muted">שאלות נפוצות, תקנון, פרטיות והחזרים. עמוד שמסומן "טיוטה" לא מוצג באתר ולא מקושר מהפוטר. עמודי התקנון הם נוסח פתיחה בלבד — יש להשלים את הסעיפים שמסומנים [להשלים] ולהעביר לבדיקה משפטית לפני פרסום.</p>
