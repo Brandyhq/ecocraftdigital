@@ -8,6 +8,8 @@ export type Bindings = {
   SETUP_TOKEN?: string
   /** Optional canonical origin (e.g. https://ecocraftdigital.com). Defaults to the request host. */
   SITE_URL?: string
+  /** 'mock' enables the test payment gateway. Local development only: never set it in production. */
+  PAYMENT_GATEWAY?: string
   /** PayPal REST app credentials. When both are set, checkout uses automatic PayPal payments. */
   PAYPAL_CLIENT_ID?: string
   PAYPAL_CLIENT_SECRET?: string

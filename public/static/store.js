@@ -31,10 +31,10 @@ function applyTheme(){
 
 /* ---------- state ---------- */
 let cart=loadCart(), route={name:'home'}, activeCat='all';
-let orderResult=null, placing=false;
+let orderResult=null, placing=false, checkoutCfg=null, currentOrder=null;
 
 function loadCart(){try{return JSON.parse(localStorage.getItem('ec_cart')||'{}');}catch(e){return{};}}
-function saveCart(){try{localStorage.setItem('ec_cart',JSON.stringify(cart));}catch(e){}}
+function saveCart(){currentOrder=null;try{localStorage.setItem('ec_cart',JSON.stringify(cart));}catch(e){}} /* a changed cart means a new order */
 function cartCount(){return Object.values(cart).reduce((a,b)=>a+b,0);}
 function P(){return DATA.products;}
 function findP(id){return P().find(x=>x.id===id);}
@@ -44,13 +44,13 @@ function cur(){return DATA.design.currency||'₪';}
 function money(n){return n+cur();}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-function addToCart(id,silent){cart[id]=(cart[id]||0)+1;saveCart();updateCartBadge();if(!silent)toast('נוסף לעגלה ✓');}
+function addToCart(id,silent){cart[id]=(cart[id]||0)+1;saveCart();updateCartBadge();if(!silent)openCart();}
 function setQty(id,q){if(q<=0)delete cart[id];else cart[id]=q;saveCart();}
 
 /* ---------- orders ---------- */
-async function placeOrder(customer){
+async function placeOrder(customer,extra){
   const items=cartItems().map(({p,q})=>({id:p.id,quantity:q}));
-  const res=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer,items})});
+  const res=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer,items,...extra})});
   const data=await res.json().catch(()=>({}));
   if(!res.ok||!data.success)throw new Error(data.error||'שגיאה ביצירת ההזמנה');
   return data.order;
@@ -130,6 +130,7 @@ window.addEventListener('popstate',()=>{route=routeFromPath();render();});
 /* ---------- header ---------- */
 function header(){
   const d=DATA.design;
+  if(route.name==='checkout')return `<header><div class="wrap"><div class="nav co-nav"><a class="logo" href="/" data-nav="home"><img class="logo-img" src="/static/img/ecocraftdigital-logo.png" alt="${esc(d.brandName)}" width="64" height="64"></a><span class="co-secure"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>קופה מאובטחת</span></div></div></header>`;
   const links=[['home','בית'],['shop','חנות'],['about','עלינו']];
   return `<header><div class="wrap"><nav class="nav">
     <a class="logo" href="/" data-nav="home"><img class="logo-img" src="/static/img/ecocraftdigital-logo.png" alt="${esc(d.brandName)}" width="64" height="64">
@@ -336,34 +337,142 @@ function summaryBox(gotoName,label){
   return `<div class="summary"><h3>סיכום הזמנה</h3>
     <div class="sum-row"><span>סכום ביניים</span><span>${money(sub)}</span></div>
     <div class="sum-row"><span>מוצרים דיגיטליים</span><span>ללא משלוח</span></div>
-    <div class="promo"><input type="text" placeholder="קוד קופון" id="promo"><button id="applyPromo">החלה</button></div>
-    <div class="sum-row total"><span>סה"כ</span><b>${money(sub)}</b></div>
+    <div class="sum-row total"><span>סה"כ (כולל מע״מ)</span><b>${money(sub)}</b></div>
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-nav="${gotoName}">${label}</button>
-    <p style="text-align:center;font-size:13px;color:var(--ink-soft);margin:14px 0 0">תשלום מאובטח · הורדה מיידית</p></div>`;
+    <p style="text-align:center;font-size:13px;color:var(--ink-soft);margin:14px 0 0">תשלום מאובטח</p></div>`;
 }
 
-/* ---------- checkout ---------- */
+/* ---------- side cart ---------- */
+let drawerOpener=null;
+function drawerInner(){
+  const items=cartItems(), total=cartTotal();
+  const rec=P().find(p=>!cart[p.id]&&p.deliverable);
+  const rows=items.map(({p,q})=>`<div class="dr-row"><div class="dr-info"><h4>${esc(p.name)}</h4>
+      <div class="dr-qty"><button type="button" data-ddec="${p.id}" aria-label="הפחתת כמות: ${esc(p.name)}">−</button><span aria-live="polite">${q}</span><button type="button" data-dinc="${p.id}" aria-label="הוספת כמות: ${esc(p.name)}">+</button>
+      <button type="button" class="dr-remove" data-dremove="${p.id}">הסרה</button></div></div><div class="dr-price">${money(p.price*q)}</div></div>`).join('');
+  return `<div class="dr-head"><h2 id="drTitle">העגלה שלך</h2><button type="button" class="dr-close" aria-label="סגירת העגלה">✕</button></div>
+    <div class="dr-body">${items.length?rows:'<p class="dr-empty">העגלה ריקה.</p>'}
+      ${items.length&&rec?`<div class="dr-rec"><span class="dr-rec-t">אולי יעניין אותך</span><div class="dr-rec-row"><div><b>${esc(rec.name)}</b><div class="dr-note">${money(rec.price)}</div></div><button type="button" class="btn btn-ghost btn-sm" data-dadd="${rec.id}">הוספה</button></div></div>`:''}</div>
+    <div class="dr-foot">${items.length?`<div class="dr-total"><span>סה"כ (כולל מע״מ)</span><b>${money(total)}</b></div>
+      <button type="button" class="btn btn-primary btn-block" data-dcheckout>לקופה</button>`:''}
+      <button type="button" class="dr-continue" data-dclose>המשך קנייה</button></div>`;
+}
+function drawerKey(e){
+  const el=document.getElementById('cartDrawer');if(!el)return;
+  if(e.key==='Escape'){closeCart();return;}
+  if(e.key!=='Tab')return;
+  const f=[...el.querySelectorAll('button:not([disabled]),a[href]')];if(!f.length)return;
+  const first=f[0],last=f[f.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+}
+function openCart(opener){
+  closeCart(true);
+  drawerOpener=opener||document.activeElement;
+  const el=document.createElement('div');el.className='drawer-back';el.id='cartDrawer';
+  el.innerHTML=`<aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="drTitle"></aside>`;
+  document.body.appendChild(el);document.body.classList.add('no-scroll');
+  paintDrawer('.dr-close');
+  document.addEventListener('keydown',drawerKey);
+}
+function paintDrawer(focusSel){
+  const el=document.getElementById('cartDrawer');if(!el)return;
+  const dr=el.querySelector('.drawer');dr.innerHTML=drawerInner();
+  el.onclick=e=>{if(e.target===el)closeCart();};
+  dr.querySelector('.dr-close').onclick=()=>closeCart();
+  dr.querySelectorAll('[data-dclose]').forEach(b=>b.onclick=()=>closeCart());
+  const co=dr.querySelector('[data-dcheckout]');if(co)co.onclick=()=>{closeCart(true);nav('checkout');};
+  dr.querySelectorAll('[data-dinc]').forEach(b=>b.onclick=()=>{setQty(b.dataset.dinc,(cart[b.dataset.dinc]||0)+1);updateCartBadge();paintDrawer('[data-dinc="'+b.dataset.dinc+'"]');});
+  dr.querySelectorAll('[data-ddec]').forEach(b=>b.onclick=()=>{setQty(b.dataset.ddec,(cart[b.dataset.ddec]||0)-1);updateCartBadge();paintDrawer(cart[b.dataset.ddec]?'[data-ddec="'+b.dataset.ddec+'"]':'.dr-close');});
+  dr.querySelectorAll('[data-dremove]').forEach(b=>b.onclick=()=>{delete cart[b.dataset.dremove];saveCart();updateCartBadge();paintDrawer('.dr-close');});
+  dr.querySelectorAll('[data-dadd]').forEach(b=>b.onclick=()=>{cart[b.dataset.dadd]=(cart[b.dataset.dadd]||0)+1;saveCart();updateCartBadge();paintDrawer('.dr-close');});
+  const f=dr.querySelector(focusSel||'.dr-close');if(f)f.focus();
+}
+function closeCart(silent){
+  const el=document.getElementById('cartDrawer');if(!el)return;
+  el.remove();document.body.classList.remove('no-scroll');document.removeEventListener('keydown',drawerKey);
+  if(!silent&&drawerOpener&&document.contains(drawerOpener))drawerOpener.focus();
+}
+
+/* ---------- checkout: one page, no account ---------- */
+const MAIL_FIX={'gmial.com':'gmail.com','gmai.com':'gmail.com','gamil.com':'gmail.com','gmail.co':'gmail.com','gmail.con':'gmail.com','hotmial.com':'hotmail.com','hotmai.com':'hotmail.com','hotmail.con':'hotmail.com','yaho.com':'yahoo.com','yahooo.com':'yahoo.com','outlok.com':'outlook.com','walla.co':'walla.co.il'};
+function suggestMail(v){const m=String(v).trim().toLowerCase().match(/^([^@\s]+)@([^@\s]+)$/);return m&&MAIL_FIX[m[2]]?m[1]+'@'+MAIL_FIX[m[2]]:'';}
+function quickMethods(){
+  const c=checkoutCfg;if(!c||!c.gateway||!c.quickPay)return [];
+  const m=[];
+  if(c.quickPay.bit)m.push(['bit','Bit']);
+  if(c.quickPay.applePay&&window.ApplePaySession)m.push(['applePay','Apple Pay']);
+  if(c.quickPay.googlePay)m.push(['googlePay','Google Pay']);
+  return m;
+}
 function checkoutPage(){
   const items=cartItems();if(!items.length)return cartPage();
-  const sub=cartTotal();
-  return `<main><div class="page-head"><div class="wrap"><span class="eyebrow">תשלום</span><h1>סיום הזמנה</h1></div></div>
-  <div class="wrap"><div class="co-layout"><div>
-    <div class="co-card"><h3><span class="step-n">1</span> פרטי הלקוח</h3><p class="co-sub">לכתובת זו יישלחו הקבלה והקובץ הדיגיטלי.</p>
-      <div class="field"><label for="coName">שם מלא</label><input type="text" id="coName" autocomplete="name" placeholder="השם שלך" maxlength="120"></div>
-      <div class="field"><label for="coEmail">כתובת אימייל</label><input type="email" id="coEmail" autocomplete="email" placeholder="name@example.com" maxlength="200"></div>
-      <div class="field"><label for="coPhone">טלפון (לא חובה)</label><input type="tel" id="coPhone" autocomplete="tel" placeholder="050-0000000" maxlength="30"></div></div>
-    <div class="co-card"><h3><span class="step-n">2</span> תשלום</h3>
-      <p class="co-sub">אחרי שליחת ההזמנה יוצג מספר ההזמנה וכפתורי התשלום. הקובץ נשלח לאימייל לאחר שנאשר ידנית את קבלת התשלום.</p>
-      <div class="pay-lines">${items.map(({p,q})=>`<div class="pay-line"><div class="pl-info"><div class="pi">${esc(p.name)}</div><div class="pd-note">${money(p.price)}${q>1?' × '+q:''}</div></div></div>`).join('')}</div>
-    </div>
-  </div>
-  <div class="summary"><h3>ההזמנה שלך</h3>
-    ${items.map(({p,q})=>`<div class="sum-row"><span>${esc(p.name)} ${q>1?'× '+q:''}</span><span>${money(p.price*q)}</span></div>`).join('')}
-    <div class="sum-row total"><span>סה"כ לתשלום</span><b>${money(sub)}</b></div>
-    <button class="btn btn-primary btn-block" style="margin-top:16px" id="placeOrder">שליחת הזמנה ומעבר לתשלום</button>
-    <p style="text-align:center;font-size:13px;color:var(--ink-soft);margin:12px 0 0">תשלום מאובטח · הורדה מיידית</p></div>
+  const sub=cartTotal(), gw=checkoutCfg&&checkoutCfg.gateway, card=gw&&checkoutCfg.embeddedCard, quick=quickMethods();
+  const lk=(slug,label)=>hasPage(slug)?`<a href="${pageHref(slug)}" target="_blank" rel="noopener">${label}</a>`:label;
+  return `<main class="co-main"><div class="wrap"><h1 class="co-title">סיום הזמנה</h1>
+  <div class="co-layout"><form id="coForm" novalidate>
+    ${quick.length?`<div class="co-card"><h3>תשלום מהיר</h3><div class="quick">${quick.map(([k,l])=>`<button type="button" class="btn btn-ghost quick-btn" data-quick="${k}">${l}</button>`).join('')}</div><p class="co-sub" style="margin:12px 0 0">או מלאי את הפרטים ושלמי בכרטיס.</p></div>`:''}
+    <div class="co-card"><h3>הפרטים שלך</h3><p class="co-sub">לכתובת זו יישלחו הקבלה והקובץ.</p>
+      <div class="field"><label for="coEmail">כתובת אימייל</label><input type="email" id="coEmail" name="email" autocomplete="email" inputmode="email" placeholder="name@example.com" maxlength="200" required aria-describedby="mailHint"><div id="mailHint" class="field-hint" aria-live="polite"></div></div>
+      <div class="field"><label for="coName">שם מלא (לקבלה)</label><input type="text" id="coName" name="name" autocomplete="name" placeholder="השם שלך" maxlength="120" required></div></div>
+    <div class="co-card"><h3>תשלום</h3>
+      ${card?`<div id="cardArea" class="card-area"><p class="co-sub">טופס התשלום יוצג כאן אחרי לחיצה על "תשלום".</p></div>`:`<p class="co-sub">אחרי שליחת ההזמנה יוצגו מספר ההזמנה וקישורי התשלום. הקובץ יישלח לאימייל אחרי שנאשר ידנית את קבלת התשלום.</p>`}
+      <label class="check-row"><input type="checkbox" id="coTerms" required><span>אני מאשרת את ${lk('terms','התקנון')} ואת ${lk('refunds','מדיניות הביטולים')}.</span></label>
+      <label class="check-row"><input type="checkbox" id="coMarketing"><span>אשמח לקבל עדכונים ומבצעים במייל (אפשר להסיר בכל עת).</span></label>
+      <p id="coErr" class="co-err" role="alert"></p>
+      <button type="submit" class="btn btn-primary btn-block" id="placeOrder">${gw?'תשלום '+money(sub):'שליחת הזמנה'}</button>
+      <p id="payStatus" class="pay-status" role="status" aria-live="polite"></p></div>
+  </form>
+  <aside class="summary co-summary"><h3>ההזמנה שלך</h3>
+    ${items.map(({p,q})=>`<div class="sum-row"><span>${esc(p.name)}${q>1?' × '+q:''}</span><span>${money(p.price*q)}</span></div>`).join('')}
+    <div class="sum-row total"><span>סה"כ (כולל מע״מ)</span><b>${money(sub)}</b></div>
+    <p class="sum-note">מוצרים דיגיטליים, ללא משלוח.</p></aside>
   </div></div></main>`;
 }
+function coFail(id,msg){
+  const err=document.getElementById('coErr');if(err)err.textContent=msg;
+  document.querySelectorAll('#coForm [aria-invalid]').forEach(x=>x.removeAttribute('aria-invalid'));
+  const f=document.getElementById(id);if(f){f.setAttribute('aria-invalid','true');f.focus();}
+  return false;
+}
+async function submitCheckout(method){
+  if(placing)return;
+  const email=document.getElementById('coEmail').value.trim(), name=document.getElementById('coName').value.trim();
+  const terms=document.getElementById('coTerms').checked, marketing=document.getElementById('coMarketing').checked;
+  document.getElementById('coErr').textContent='';
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))return coFail('coEmail','נא להזין כתובת אימייל תקינה');
+  if(!name)return coFail('coName','נא למלא שם מלא');
+  if(!terms)return coFail('coTerms','כדי להמשיך צריך לאשר את התקנון ואת מדיניות הביטולים');
+  const po=document.getElementById('placeOrder'), label=po.textContent;
+  placing=true;po.disabled=true;po.textContent='שולחת…';
+  try{
+    if(!currentOrder)currentOrder=await placeOrder({name,email},{terms:true,marketing,method:method||'card'});
+    const o=currentOrder;
+    if(o.approveUrl){location.href=o.approveUrl;return;} /* automatic PayPal: the cart is cleared when the customer returns paid */
+    if(o.embedUrl){showPayFrame(o);po.hidden=true;return;}
+    orderResult={...o,email};cart={};saveCart();currentOrder=null;nav('success');
+  }catch(err){coFail('coEmail',err.message);po.disabled=false;po.textContent=label;}
+  finally{placing=false;}
+}
+function showPayFrame(o){
+  const area=document.getElementById('cardArea');if(!area)return;
+  area.innerHTML=`<iframe class="card-frame" src="${esc(o.embedUrl)}" title="טופס תשלום מאובטח" allow="payment"></iframe>`;
+  area.querySelector('iframe').focus();
+}
+window.addEventListener('message',e=>{
+  const d=e.data;
+  if(e.origin!==location.origin||!d||d.source!=='ecocraft-mockpay'||!currentOrder)return;
+  const st=document.getElementById('payStatus');
+  if(d.outcome==='pending'){if(st)st.textContent='מאמתים את התשלום...';return;}
+  if(d.outcome==='success'&&d.token){
+    orderResult={paid:true,downloadUrl:'/download/'+encodeURIComponent(d.token)};
+    cart={};saveCart();currentOrder=null;nav('success');return;
+  }
+  /* failed: the order stays open, so retrying reuses it instead of creating a duplicate */
+  if(st)st.innerHTML='התשלום לא עבר. העגלה נשמרה. <button type="button" class="linklike" id="retryPay">לנסות שוב</button>';
+  const area=document.getElementById('cardArea');if(area)area.innerHTML='';
+  const r=document.getElementById('retryPay');if(r)r.onclick=()=>{st.textContent='';showPayFrame(currentOrder);};
+});
 
 /* ---------- success / about ---------- */
 function successPage(){
@@ -406,6 +515,7 @@ function aboutPage(){
 
 /* ---------- footer ---------- */
 const SYSTEM_PAGES=['faq','terms','privacy','refunds'];
+function hasPage(slug){return (DATA.pages||[]).some(x=>x.slug===slug);}
 function pageHref(slug){return SYSTEM_PAGES.includes(slug)?'/'+slug:'/page/'+encodeURIComponent(slug);}
 function waLink(phone){const g=String(phone).replace(/\D/g,'');return 'https://wa.me/'+(g.startsWith('972')?g:g.replace(/^0/,'972'));}
 function contactLinks(d){
@@ -416,6 +526,7 @@ function contactLinks(d){
 }
 function footer(){
   const d=DATA.design;
+  if(route.name==='checkout')return `<footer class="co-foot"><div class="wrap"><span>© 2026 ${esc(d.brandName)}</span>${[hasPage('terms')?`<a href="${pageHref('terms')}">תקנון</a>`:'',hasPage('refunds')?`<a href="${pageHref('refunds')}">מדיניות ביטולים</a>`:'',hasPage('privacy')?`<a href="${pageHref('privacy')}">פרטיות</a>`:'','<a href="/contact">יצירת קשר</a>'].join('')}</div></footer>`;
   return `<footer><div class="wrap"><div class="foot-grid${contactLinks(d)?' five':''}">
     <div><div class="logo" data-nav="home" style="margin-bottom:14px"><img class="logo-img" src="/static/img/ecocraftdigital-logo.png" alt="${esc(d.brandName)}" width="64" height="64"></div>
       <p>${esc(d.footerTagline||'')}</p></div>
@@ -445,20 +556,18 @@ function bind(){
   app.querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{delete cart[el.dataset.remove];saveCart();render();});
   app.querySelectorAll('[data-gallery]').forEach(initGallery);
   const b=document.getElementById('burger');if(b)b.onclick=()=>document.getElementById('navlinks').classList.toggle('open');
-  const po=document.getElementById('placeOrder');if(po)po.onclick=async()=>{
-    if(placing)return;
-    const name=document.getElementById('coName').value.trim(), email=document.getElementById('coEmail').value.trim(), phone=document.getElementById('coPhone').value.trim();
-    if(!name)return toast('נא למלא שם מלא',true);
-    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))return toast('נא להזין כתובת אימייל תקינה',true);
-    placing=true;po.disabled=true;po.textContent='שולחת…';
-    try{
-      const o=await placeOrder({name,email,phone});
-      if(o.approveUrl){location.href=o.approveUrl;return;} /* automatic PayPal: the cart is cleared when the customer returns paid */
-      orderResult={...o,email};cart={};saveCart();nav('success');
-    }catch(err){toast(esc(err.message),true);po.disabled=false;po.textContent='שליחת הזמנה ומעבר לתשלום';}
-    finally{placing=false;}
-  };
-  const ap=document.getElementById('applyPromo');if(ap)ap.onclick=()=>toast('קוד קופון אינו זמין בהדגמה');
+  const cf=document.getElementById('coForm');
+  if(cf){
+    cf.onsubmit=e=>{e.preventDefault();submitCheckout('card');};
+    cf.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>submitCheckout(b.dataset.quick));
+    const em=document.getElementById('coEmail'),hint=document.getElementById('mailHint');
+    em.onblur=()=>{
+      const fix=suggestMail(em.value);
+      hint.innerHTML=fix?`התכוונת ל-<button type="button" class="linklike" id="fixMail">${esc(fix)}</button>?`:'';
+      const fb=document.getElementById('fixMail');if(fb)fb.onclick=()=>{em.value=fix;hint.textContent='';};
+    };
+  }
+  app.querySelectorAll('.icon-btn[data-nav="cart"]').forEach(el=>el.onclick=e=>{e.preventDefault();openCart(el);});
   const sb=document.getElementById('subBtn');if(sb)sb.onclick=()=>toast('נרשמת לרשימת התפוצה ✓');
 }
 function updateCartBadge(){
@@ -474,6 +583,7 @@ function toast(msg,isErr){const t=document.getElementById('toast');t.innerHTML=m
 
 /* ---------- boot ---------- */
 if(DATA.design)applyTheme();
+fetch('/api/checkout/config').then(r=>r.json()).then(d=>{checkoutCfg=d;if(route.name==='checkout'&&!currentOrder)render();}).catch(()=>{});
 /* returning from PayPal: ?paid=<download token> after a captured payment, ?payment=cancelled|failed|pending otherwise */
 const q=new URLSearchParams(location.search);
 let bootToast=null;

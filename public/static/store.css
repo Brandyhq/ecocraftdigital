@@ -318,3 +318,56 @@ footer{background:var(--cream-2);border-top:1px solid var(--line);padding:52px 0
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
   .btn:hover,.cat-card:hover{transform:none}
 }
+
+/* side cart */
+.drawer-back{position:fixed;inset:0;background:rgba(38,37,31,.5);z-index:300;display:flex;justify-content:flex-end} /* RTL: flex-end is the left edge */
+.drawer{background:var(--card);width:min(420px,100%);height:100%;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);animation:drin .25s ease}
+@keyframes drin{from{transform:translateX(-24px);opacity:0}to{transform:none;opacity:1}}
+.dr-head{display:flex;align-items:center;justify-content:space-between;padding:20px 22px;border-bottom:1px solid var(--line)}
+.dr-head h2{font-size:22px;color:var(--sage-deep)}
+.dr-close{width:40px;height:40px;border-radius:50%;font-size:18px;color:var(--ink-soft)}
+.dr-close:hover{background:var(--cream-2)}
+.dr-body{flex:1;overflow-y:auto;padding:8px 22px}
+.dr-row{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--line)}
+.dr-info{min-width:0;flex:1}.dr-info h4{font-family:inherit;font-weight:700;font-size:16px;line-height:1.35;margin-bottom:8px}
+.dr-qty{display:flex;align-items:center;gap:10px}
+.dr-qty button:not(.dr-remove){width:32px;height:32px;border-radius:50%;border:1.5px solid var(--line);font-size:17px;line-height:1}
+.dr-qty button:not(.dr-remove):hover{border-color:var(--sage)}
+.dr-remove{font-size:13.5px;color:var(--ink-soft);text-decoration:underline;margin-inline-start:6px}
+.dr-price{font-weight:700;white-space:nowrap}
+.dr-empty{padding:30px 0;color:var(--ink-soft)}
+.dr-rec{margin-top:18px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--cream)}
+.dr-rec-t{font-size:13px;color:var(--blush-deep);font-weight:700}
+.dr-rec-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
+.dr-note{font-size:13.5px;color:var(--ink-soft)}
+.dr-foot{padding:18px 22px 22px;border-top:1px solid var(--line);display:grid;gap:10px}
+.dr-total{display:flex;justify-content:space-between;font-size:17px}.dr-total b{font-family:var(--hfont),serif;font-size:22px;color:var(--sage-deep)}
+.dr-continue{font-weight:600;color:var(--ink-soft);text-decoration:underline;padding:6px}
+body.no-scroll{overflow:hidden}
+@media (max-width:560px){.drawer{width:100%}}
+
+/* one-page checkout */
+.co-nav{justify-content:space-between}
+.co-secure{display:inline-flex;align-items:center;gap:8px;font-weight:700;color:var(--sage-deep);font-size:15px}
+.co-title{font-size:clamp(26px,3.4vw,34px);color:var(--sage-deep);margin:30px 0 22px}
+.co-foot{border-top:1px solid var(--line);margin-top:30px;padding:22px 0;font-size:14px;color:var(--ink-soft)}
+.co-foot .wrap{display:flex;gap:18px;flex-wrap:wrap}
+.co-foot a{text-decoration:underline}
+.quick{display:flex;gap:10px;flex-wrap:wrap}.quick-btn{flex:1;min-width:120px}
+.field-hint{font-size:13.5px;color:var(--ink-soft);min-height:0;margin-top:6px}
+.linklike{color:var(--sage-deep);text-decoration:underline;font-weight:700;padding:0}
+.check-row{display:flex;gap:11px;align-items:flex-start;margin:14px 0;font-size:15px;cursor:pointer}
+.check-row input{width:20px;height:20px;margin-top:3px;accent-color:var(--sage);flex:0 0 auto}
+.check-row a{text-decoration:underline;color:var(--sage-deep)}
+.co-err{color:var(--blush-deep);font-weight:600;min-height:0;margin:10px 0 14px}
+.co-err:empty{display:none}
+[aria-invalid="true"]{border-color:var(--blush-deep)!important}
+.card-area{margin-bottom:6px}
+.card-frame{width:100%;height:320px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.pay-status{margin:12px 0 0;font-size:14.5px;color:var(--ink-soft)}
+.pay-status:empty{display:none}
+.sum-note{font-size:13px;color:var(--ink-soft);margin:14px 0 0}
+@media (max-width:900px){.co-summary{order:-1}}
+.mock-pay{padding:18px}.mock-note{font-size:13px;color:var(--blush-deep);font-weight:700;margin:0 0 12px}
+.mock-actions{display:grid;gap:10px;margin-top:14px}
+#st{font-size:14px;color:var(--ink-soft);margin:12px 0 0}
