@@ -111,7 +111,7 @@ section.block{padding:56px 0}
 .gen-cover small{display:block;font-family:"Assistant";font-weight:600;font-size:13px;letter-spacing:1px;margin-top:8px;opacity:.9}
 .card .body{padding:18px 20px 20px;display:flex;flex-direction:column;flex:1}
 .card .kicker{font-size:12px;font-weight:700;color:var(--blush-deep);margin-bottom:6px}
-.card h3{font-size:20px;color:var(--ink);margin-bottom:6px}
+.card h2,.card h3{font-size:20px;color:var(--ink);margin-bottom:6px}
 .card .desc{font-size:14.5px;color:var(--ink-soft);flex:1;margin-bottom:14px}
 .card .foot{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .price{font-family:var(--hfont),serif;font-weight:900;font-size:23px;color:var(--sage-deep)}
@@ -250,7 +250,7 @@ section.block{padding:56px 0}
 
 footer{background:var(--cream-2);border-top:1px solid var(--line);padding:52px 0 30px;margin-top:20px}
 .foot-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr 1.3fr;gap:34px;margin-bottom:34px}
-.foot-grid h5{font-family:var(--hfont),serif;font-size:17px;color:var(--sage-deep);margin:0 0 14px}
+.foot-grid .fh{font-family:var(--hfont),serif;font-size:17px;color:var(--sage-deep);margin:0 0 14px}
 .foot-grid a{display:block;color:var(--ink-soft);font-size:15px;padding:5px 0;transition:.15s;cursor:pointer}
 .foot-grid a:hover{color:var(--sage-deep)}
 .foot-grid p{color:var(--ink-soft);font-size:15px;margin:0 0 14px}

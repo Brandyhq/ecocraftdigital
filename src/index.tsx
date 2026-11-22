@@ -109,7 +109,7 @@ async function contentPage(c: Context<AppEnv>, slug: string) {
   const site = await getSiteData(c.env.DB)
   const d = site.design as Record<string, string>
   if (!row) return c.html(page({ origin: originOf(c), path: '/', site, static: true, noindex: true, title: 'העמוד לא נמצא', description: '', body: staticBody(site, 'העמוד לא נמצא', '<p>העמוד שחיפשת לא קיים. <a href="/shop">לכל המוצרים</a></p>') }), 404)
-  const text = fillVars(row.body, { businessName: d.businessName, businessId: d.businessId, contactEmail: d.contactEmail, siteUrl: originOf(c) })
+  const text = fillVars(row.body, { businessName: d.businessName, businessId: d.businessId, contactEmail: d.contactEmail, contactPhone: d.contactPhone, siteUrl: originOf(c) })
   const origin = originOf(c)
   return c.html(
     page({
