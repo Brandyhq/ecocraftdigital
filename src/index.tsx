@@ -7,6 +7,7 @@ import type { Site } from './lib/ssr'
 import { faqLd, fillVars, firstText, hasPlaceholders, renderBody } from './lib/content'
 import { aboutBody, breadcrumbLd, contactBody, homeBody, organizationLd, page, pageHref, productBody, productLd, shopBody, staticBody, SYSTEM_PAGES } from './lib/ssr'
 import admin from './routes/admin'
+import { catalog } from './routes/catalog'
 import { publicApi, publicFiles } from './routes/public'
 
 const app = new Hono<AppEnv>()
@@ -18,6 +19,7 @@ app.use('*', async (c, next) => {
 })
 
 app.route('/api/admin', admin)
+app.route('/api/catalog', catalog)
 app.route('/api', publicApi)
 app.route('/', publicFiles)
 

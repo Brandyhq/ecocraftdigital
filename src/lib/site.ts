@@ -7,6 +7,8 @@ type ProductRow = {
   name: string
   price: number
   old_price: number | null
+  price_agorot?: number | null
+  old_price_agorot?: number | null
   tag: string
   tag_type: string
   rating: number
@@ -25,6 +27,10 @@ type ProductRow = {
   file_url: string
   file_id: string | null
 }
+
+/** Whole agorot are the source of truth; the REAL column is only a fallback for rows written before the migration. */
+const priceOf = (p: ProductRow) => (p.price_agorot ? p.price_agorot / 100 : p.price)
+const oldPriceOf = (p: ProductRow): number | '' => (p.old_price_agorot ? p.old_price_agorot / 100 : p.old_price ?? '')
 
 function parseImages(raw: string | null | undefined): string[] {
   try {
@@ -116,8 +122,8 @@ export async function getSiteData(db: D1Database) {
       cat: p.category_id ?? '',
       catName: p.category_name ?? '',
       name: p.name,
-      price: p.price,
-      old: p.old_price ?? '',
+      price: priceOf(p),
+      old: oldPriceOf(p),
       tag: p.tag,
       tagType: p.tag_type,
       rating: p.rating,

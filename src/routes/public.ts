@@ -75,13 +75,17 @@ publicApi.post('/orders', async (c) => {
   const db = c.env.DB
   const slugs = [...wanted.keys()]
   const { results } = await db
-    .prepare(`SELECT id, slug, name, price, paypal_url FROM products WHERE active = 1 AND slug IN (${slugs.map(() => '?').join(',')})`)
+    .prepare(`SELECT id, slug, name, price, price_agorot, paypal_url FROM products WHERE active = 1 AND slug IN (${slugs.map(() => '?').join(',')})`)
     .bind(...slugs)
-    .all<{ id: number; slug: string; name: string; price: number; paypal_url: string }>()
+    .all<{ id: number; slug: string; name: string; price: number; price_agorot: number; paypal_url: string }>()
   if (results.length !== slugs.length) return c.json({ success: false, error: 'חלק מהמוצרים אינם זמינים עוד' }, 409)
 
-  const lines = results.map((p) => ({ ...p, quantity: wanted.get(p.slug)! }))
-  const total = Math.round(lines.reduce((sum, l) => sum + l.price * l.quantity, 0) * 100) / 100
+  // Prices come from the catalog only, in whole agorot (never from the browser); the legacy REAL column covers unmigrated rows.
+  const lines = results.map((p) => {
+    const agorot = p.price_agorot || Math.round(p.price * 100)
+    return { ...p, price: agorot / 100, agorot, quantity: wanted.get(p.slug)! }
+  })
+  const total = lines.reduce((sum, l) => sum + l.agorot * l.quantity, 0) / 100
 
   await db
     .prepare(

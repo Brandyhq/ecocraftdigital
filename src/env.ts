@@ -1,4 +1,6 @@
 export type Bindings = {
+  /** Private R2 bucket with the product files. Not bound until the bucket exists (see ECOMMERCE_SPEC.md, section 4). */
+  FILES?: R2Bucket
   DB: D1Database
   /** HMAC key for admin session cookies (wrangler pages secret put SESSION_SECRET). */
   SESSION_SECRET: string
