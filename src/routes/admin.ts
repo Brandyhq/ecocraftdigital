@@ -142,7 +142,7 @@ type ProductRow = Record<string, unknown> & { includes: string; id: number }
 const shapeProduct = (p: ProductRow) => ({ ...p, includes: JSON.parse(p.includes || '[]'), images: JSON.parse((p.images as string) || '[]') })
 
 const PRODUCT_COLS = [
-  'slug', 'name', 'short_description', 'description', 'includes', 'price', 'old_price', 'category_id', 'tag', 'tag_type', 'rating',
+  'slug', 'name', 'short_description', 'description', 'includes', 'price', 'price_agorot', 'old_price', 'old_price_agorot', 'access_url', 'category_id', 'tag', 'tag_type', 'rating',
   'reviews', 'image_url', 'images', 'video_url', 'cover_title', 'cover_sub', 'cover_from', 'cover_to', 'paypal_url', 'file_url', 'file_id', 'active', 'sort_order'
 ] as const
 

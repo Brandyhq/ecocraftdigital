@@ -1,0 +1,111 @@
+{
+  "_comment": [
+    "Catalog seed for ECOMMERCE_SPEC.md, section 3. Not wired to any code yet: it documents the catalog and will feed the file migration to R2.",
+    "Prices are the live site prices on 2026-11-22 (they match docs/PRODUCT_COPY.md), in agorot, VAT included. The spec asked for TODO; they were already set, so nothing is invented.",
+    "legacy_delivery: how the product is delivered today. external_link = a private link in the back office, d1_file = a file stored in the database, missing = nothing to deliver yet.",
+    "files: empty until the files are uploaded to the private R2 bucket (each entry will be {label_he, r2_key}). access_url: TODO means the owner has to supply the link; it must never be committed here.",
+    "New products from docs/PRODUCT_COPY.md that do not exist on the site yet are not listed: 30 יום של רישום, חנוכה של אור (price TODO), הזמנה דיגיטלית לחתונה (a service, not a file)."
+  ],
+  "currency": "ILS",
+  "vat_included": true,
+  "products": [
+    {
+      "slug": "fashion-studio",
+      "name_he": "הסטודיו הדיגיטלי למעצבת האופנה",
+      "price_agorot": 16900,
+      "active": true,
+      "delivery_type": "file",
+      "access_url": null,
+      "files": [],
+      "legacy_delivery": "external_link",
+      "category": "fashion",
+      "badge": "חדש",
+      "image": "/static/img/product-fashion-studio.jpg",
+      "short_desc_he": "67 עמודי תכנון ושרטוט למעצבות אופנה — קרוקי מקצועיים, סקיצות שטוחות, תיק טכני ולוחות השראה. תואם GoodNotes ו-Procreate."
+    },
+    {
+      "slug": "adhd-planner",
+      "name_he": "מתכנן ADHD דיגיטלי",
+      "price_agorot": 6900,
+      "active": true,
+      "delivery_type": "file",
+      "access_url": null,
+      "files": [],
+      "legacy_delivery": "external_link",
+      "category": "planners",
+      "badge": "הכי נמכר",
+      "image": "/static/img/product-adhd-planner.jpg",
+      "short_desc_he": "מתכנן ממוקד לבעלי הפרעת קשב — פירוק משימות, מיקוד וניהול יום בעברית."
+    },
+    {
+      "slug": "kids-bundle",
+      "name_he": "חבילת 5 משחקים אינטראקטיביים",
+      "price_agorot": 5900,
+      "active": true,
+      "delivery_type": "access",
+      "access_url": "TODO",
+      "files": [],
+      "legacy_delivery": "external_link",
+      "category": "games",
+      "badge": "חבילה משתלמת",
+      "image": "/media/e402b8cd-5bec-4afe-94f0-202303c5c081",
+      "short_desc_he": "5 משחקי למידה אינטראקטיביים לילדים — בלי הדפסה, עובד על כל מכשיר."
+    },
+    {
+      "slug": "ai-course",
+      "name_he": "קורס AI לנשות עסקים",
+      "price_agorot": 24900,
+      "active": true,
+      "delivery_type": "both",
+      "access_url": "TODO",
+      "files": [],
+      "legacy_delivery": "external_link",
+      "category": "courses",
+      "badge": "חדש",
+      "image": "/media/7d91b1c9-2918-4ae1-aeb8-ea2e0d050b83",
+      "short_desc_he": "ללמוד לרתום בינה מלאכותית לעסק — צעד אחר צעד, בעברית פשוטה."
+    },
+    {
+      "slug": "focus-planner",
+      "name_he": "מתכנן פוקוס יומי - FocusMate",
+      "price_agorot": 7900,
+      "active": true,
+      "delivery_type": "file",
+      "access_url": null,
+      "files": [],
+      "legacy_delivery": "d1_file",
+      "category": "planners",
+      "badge": "",
+      "image": "/media/70c8ace4-b76f-481c-be2e-eda34213071b",
+      "short_desc_he": "מתכנן יומי מינימליסטי שמחבר בין זרימה, מיקוד ורעיונות."
+    },
+    {
+      "slug": "morning-focus",
+      "name_he": "בוקר פוקוס - ערכת הבוקר הממוקד",
+      "price_agorot": 5900,
+      "active": true,
+      "delivery_type": "file",
+      "access_url": null,
+      "files": [],
+      "legacy_delivery": "missing",
+      "category": "planners",
+      "badge": "חדש",
+      "image": "/media/6835e58e-c16b-47f2-ac74-c3c747dff758",
+      "short_desc_he": "ערכת בוקר אינטראקטיבית לנוירו-שונים -מצב רוח, אנרגיה, טעינת גוף ומשימה אחת עם טיימר."
+    },
+    {
+      "slug": "p-6d49512b",
+      "name_he": "המתכנן האולטימטיבי לסטודנטים",
+      "price_agorot": 4900,
+      "active": true,
+      "delivery_type": "file",
+      "access_url": null,
+      "files": [],
+      "legacy_delivery": "external_link",
+      "category": "planners",
+      "badge": "חדש",
+      "image": "/media/8ff3ff54-031e-442c-b0d9-732bdf849678",
+      "short_desc_he": "מתכנן הסטודנט/ית תשפ״ז · 2026–2027 מתכנן דיגיטלי בעברית לשנת הלימודים האקדמית, מותאם לסטודנטים בישראל."
+    }
+  ]
+}

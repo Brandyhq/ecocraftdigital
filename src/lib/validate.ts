@@ -81,6 +81,9 @@ export type ProductInput = {
   description: string
   includes: string[]
   price: number
+  price_agorot: number
+  old_price_agorot: number | null
+  access_url: string
   old_price: number | null
   category_id: string | null
   tag: string
@@ -122,6 +125,8 @@ export function parseProduct(body: unknown): Parsed<ProductInput> {
   if (images.length > MAX_GALLERY_IMAGES) return fail(`אפשר להוסיף עד ${MAX_GALLERY_IMAGES} תמונות לגלריה`)
   const videoRaw = text(body.video_url, 500)
   if (videoRaw && !parseVideo(videoRaw)) return fail('קישור הסרטון חייב להיות https מ-YouTube או Vimeo, או קובץ mp4/webm')
+  const accessUrl = httpsUrl(body.access_url)
+  if (accessUrl === null) return fail('קישור הכניסה חייב להתחיל ב-https://')
   const paypal = httpsUrl(body.paypal_url)
   if (paypal === null) return fail('קישור PayPal חייב להתחיל ב-https://')
   const fileUrl = httpsUrl(body.file_url)
@@ -136,8 +141,12 @@ export function parseProduct(body: unknown): Parsed<ProductInput> {
       short_description: text(body.short_description, 500),
       description: text(body.description, 5000),
       includes,
-      price,
-      old_price: oldPrice,
+      // One value in, both representations out: whole agorot are the source of truth, price stays for legacy readers.
+      price: Math.round(price * 100) / 100,
+      price_agorot: Math.round(price * 100),
+      old_price: oldPrice === null ? null : Math.round(oldPrice * 100) / 100,
+      old_price_agorot: oldPrice === null ? null : Math.round(oldPrice * 100),
+      access_url: accessUrl,
       category_id: text(body.category_id, 60) || null,
       tag: text(body.tag, 40),
       tag_type: body.tag_type === 'sage' ? 'sage' : 'rose',

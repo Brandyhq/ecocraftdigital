@@ -333,6 +333,7 @@ function productForm(p) {
       <div class="field"><label>קישור לסרטון (לא חובה)</label><input type="url" name="video_url" dir="ltr" placeholder="https://www.youtube.com/watch?v=… או Vimeo או קובץ mp4" value="${esc(p.video_url || '')}">
         <p class="hint">הסרטון נטען רק אחרי לחיצה על ניגון, ומוצג רק כשיש לפחות תמונה אחת (היא משמשת כתמונת פתיחה).</p></div></div>
     <div class="card"><h3>תשלום ומסירה</h3>
+      <div class="field"><label>קישור כניסה (שירות או משחק שנפתחים אחרי התשלום, פרטי)</label><p class="hint">נשמר, אבל עוד לא נמסר ללקוחות. המסירה שלו תתווסף בשלב 4.</p><input type="url" name="access_url" dir="ltr" placeholder="https://…" value="${esc(p.access_url || '')}"></div>
       <div class="field"><label>קישור תשלום PayPal</label><input type="url" name="paypal_url" dir="ltr" placeholder="https://paypal.me/…/49" value="${esc(p.paypal_url)}"></div>
       <div class="field"><label>קובץ דיגיטלי להורדה (פרטי — נמסר רק אחרי אישור תשלום)</label>
         <input type="hidden" name="file_id" value="${esc(p.file_id || '')}">
