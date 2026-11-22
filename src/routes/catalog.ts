@@ -56,7 +56,8 @@ catalog.get('/', async (c) => {
         image: p.image_url,
         short_desc_he: p.short_description,
         delivery_type: hasFiles && hasAccess ? 'both' : hasFiles ? 'file' : hasAccess ? 'access' : 'none',
-        deliverable: hasFiles || hasAccess,
+        // Only what the paid-order flow can hand over today. Access links join in stage 4, when delivery consumes them.
+        deliverable: hasFiles,
         files: productFiles
       }
     })
