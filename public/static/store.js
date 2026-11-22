@@ -225,10 +225,11 @@ function feat(ic,title,body){
 }
 
 /* ---------- card ---------- */
-function cardHTML(p){
+/* lvl is the heading level of the product name: 2 under the page h1 (shop), 3 under a section h2 */
+function cardHTML(p,lvl=3){
   return `<div class="card" data-prod="${p.id}">
     <div class="thumb">${p.tag?`<span class="card-tag ${p.tagType==='sage'?'sage':''}">${esc(p.tag)}</span>`:''}${coverFor(p)}</div>
-    <div class="body"><div class="kicker">${esc(p.catName||catName(p.cat))}</div><h3><a href="/product/${encodeURIComponent(p.id)}" data-plink>${esc(p.name)}</a></h3>
+    <div class="body"><div class="kicker">${esc(p.catName||catName(p.cat))}</div><h${lvl}><a href="/product/${encodeURIComponent(p.id)}" data-plink>${esc(p.name)}</a></h${lvl}>
       <div class="desc">${esc(p.short)}</div>
       <div class="foot"><div class="price">${money(p.price)}${p.old?`<span class="old">${money(p.old)}</span>`:''}</div>
         <button class="add-mini" data-add="${p.id}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>הוספה</button>
@@ -243,7 +244,7 @@ function shopPage(){
   <div class="page-head"><div class="wrap"><span class="eyebrow">החנות</span><h1>כל המוצרים הדיגיטליים</h1></div></div>
   <section class="block" style="padding-top:26px"><div class="wrap">
     <div class="cats">${cats.map(c=>`<a class="cat-pill ${activeCat===c.id?'active':''}" href="${c.id==='all'?'/shop':'/shop?cat='+encodeURIComponent(c.id)}" data-cat="${esc(c.id)}">${esc(c.name)}</a>`).join('')}</div>
-    <div class="grid">${list.map(cardHTML).join('')||'<p style="color:var(--ink-soft)">אין מוצרים בקטגוריה זו עדיין.</p>'}</div>
+    <div class="grid">${list.map(p=>cardHTML(p,2)).join('')||'<p style="color:var(--ink-soft)">אין מוצרים בקטגוריה זו עדיין.</p>'}</div>
   </div></section></main>`;
 }
 
@@ -532,7 +533,7 @@ function aboutPage(){
 }
 
 /* ---------- footer ---------- */
-const SYSTEM_PAGES=['faq','terms','privacy','refunds'];
+const SYSTEM_PAGES=['faq','terms','privacy','refunds','accessibility'];
 function hasPage(slug){return (DATA.pages||[]).some(x=>x.slug===slug);}
 function pageHref(slug){return SYSTEM_PAGES.includes(slug)?'/'+slug:'/page/'+encodeURIComponent(slug);}
 function waLink(phone){const g=String(phone).replace(/\D/g,'');return 'https://wa.me/'+(g.startsWith('972')?g:g.replace(/^0/,'972'));}
@@ -544,14 +545,14 @@ function contactLinks(d){
 }
 function footer(){
   const d=DATA.design;
-  if(route.name==='checkout')return `<footer class="co-foot"><div class="wrap"><span>© 2026 ${esc(d.brandName)}</span>${[hasPage('terms')?`<a href="${pageHref('terms')}">תקנון</a>`:'',hasPage('refunds')?`<a href="${pageHref('refunds')}">מדיניות ביטולים</a>`:'',hasPage('privacy')?`<a href="${pageHref('privacy')}">פרטיות</a>`:'','<a href="/contact">יצירת קשר</a>'].join('')}</div></footer>`;
+  if(route.name==='checkout')return `<footer class="co-foot"><div class="wrap"><span>© 2026 ${esc(d.brandName)}</span>${[hasPage('terms')?`<a href="${pageHref('terms')}">תקנון</a>`:'',hasPage('refunds')?`<a href="${pageHref('refunds')}">מדיניות ביטולים</a>`:'',hasPage('privacy')?`<a href="${pageHref('privacy')}">פרטיות</a>`:'',hasPage('accessibility')?`<a href="${pageHref('accessibility')}">הצהרת נגישות</a>`:'','<a href="/contact">יצירת קשר</a>'].join('')}</div></footer>`;
   return `<footer><div class="wrap"><div class="foot-grid${contactLinks(d)?' five':''}">
     <div><div class="logo" data-nav="home" style="margin-bottom:14px"><img class="logo-img" src="/static/img/ecocraftdigital-logo.png" alt="${esc(d.brandName)}" width="64" height="64"></div>
       <p>${esc(d.footerTagline||'')}</p></div>
-    <div><h5>חנות</h5>${DATA.categories.filter(c=>c.count>0).map(c=>`<a data-cat="${c.id}">${esc(c.name)}</a>`).join('')}<a data-nav="shop">כל המוצרים</a></div>
-    <div><h5>מידע</h5><a href="/about" data-nav="about">עלינו</a>${(DATA.pages||[]).map(p=>`<a href="${pageHref(p.slug)}">${esc(p.title)}</a>`).join('')}<a href="/contact">צור קשר</a></div>
-    ${contactLinks(d)?`<div><h5>יצירת קשר</h5>${contactLinks(d)}</div>`:''}
-    <div><h5>הישארי מעודכנת</h5><p>קבלי טיפים ומבצעים ישירות למייל.</p><div class="newsletter"><input type="email" placeholder="האימייל שלך"><button class="btn btn-primary" id="subBtn">הרשמה</button></div></div>
+    <div><h2 class="fh">חנות</h2>${DATA.categories.filter(c=>c.count>0).map(c=>`<a data-cat="${c.id}">${esc(c.name)}</a>`).join('')}<a data-nav="shop">כל המוצרים</a></div>
+    <div><h2 class="fh">מידע</h2><a href="/about" data-nav="about">עלינו</a>${(DATA.pages||[]).map(p=>`<a href="${pageHref(p.slug)}">${esc(p.title)}</a>`).join('')}<a href="/contact">צור קשר</a></div>
+    ${contactLinks(d)?`<div><h2 class="fh">יצירת קשר</h2>${contactLinks(d)}</div>`:''}
+    <div><h2 class="fh">הישארי מעודכנת</h2><p>קבלי טיפים ומבצעים ישירות למייל.</p><div class="newsletter"><input type="email" placeholder="האימייל שלך"><button class="btn btn-primary" id="subBtn">הרשמה</button></div></div>
   </div><div class="foot-bottom"><span>© 2026 ${esc(d.brandName)} · כל הזכויות שמורות</span>
   </div></div></footer>`;
 }

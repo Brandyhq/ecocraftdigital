@@ -50,7 +50,7 @@ export const waLink = (phone: string) => {
   return `https://wa.me/${intl}`
 }
 
-export const SYSTEM_PAGES = ['faq', 'terms', 'privacy', 'refunds']
+export const SYSTEM_PAGES = ['faq', 'terms', 'privacy', 'refunds', 'accessibility']
 /** System pages live at the root (/faq); custom pages under /page/. */
 export const pageHref = (slug: string) => (SYSTEM_PAGES.includes(slug) ? `/${slug}` : `/page/${encodeURIComponent(slug)}`)
 
@@ -70,16 +70,17 @@ function footer(site: Site) {
   ].filter(Boolean)
   return `<footer><div class="wrap"><div class="foot-grid">
     <div><a class="logo" href="/" data-nav="home" style="margin-bottom:14px"><img class="logo-img" src="/static/img/ecocraftdigital-logo.png" alt="${e(d.brandName)}" width="64" height="64"></a><p>${e(d.footerTagline || '')}</p></div>
-    <div><h5>חנות</h5>${cats.map((c) => `<a href="/shop?cat=${encodeURIComponent(c.id)}" data-cat="${e(c.id)}">${e(c.name)}</a>`).join('')}<a href="/shop" data-nav="shop">כל המוצרים</a></div>
-    <div><h5>מידע</h5>${info.join('')}</div>
-    ${social.length ? `<div><h5>יצירת קשר</h5>${social.join('')}</div>` : ''}
+    <div><h2 class="fh">חנות</h2>${cats.map((c) => `<a href="/shop?cat=${encodeURIComponent(c.id)}" data-cat="${e(c.id)}">${e(c.name)}</a>`).join('')}<a href="/shop" data-nav="shop">כל המוצרים</a></div>
+    <div><h2 class="fh">מידע</h2>${info.join('')}</div>
+    ${social.length ? `<div><h2 class="fh">יצירת קשר</h2>${social.join('')}</div>` : ''}
   </div><div class="foot-bottom"><span>© 2026 ${e(d.brandName)} · כל הזכויות שמורות</span></div></div></footer>`
 }
 
-function card(d: Design, p: Product) {
+/** `level` is the heading level of the product name: 2 where the page title is the h1 (shop), 3 under a section h2. */
+function card(d: Design, p: Product, level = 3) {
   const img = p.img ? `<img src="${e(p.img)}" alt="${e(p.name)}" loading="lazy">` : `<div class="gen-cover" style="background:linear-gradient(135deg,${e(p.coverFrom || '#6E8767')},${e(p.coverTo || '#4F634A')})"><div><div class="gc-inner">${e(p.coverTitle || p.name)}</div><small>${e(p.coverSub || '')}</small></div></div>`
   return `<div class="card" data-prod="${e(p.id)}"><div class="thumb">${p.tag ? `<span class="card-tag ${p.tagType === 'sage' ? 'sage' : ''}">${e(p.tag)}</span>` : ''}${img}</div>
-    <div class="body"><div class="kicker">${e(p.catName)}</div><h3><a href="/product/${encodeURIComponent(p.id)}" data-plink>${e(p.name)}</a></h3><div class="desc">${e(p.short)}</div>
+    <div class="body"><div class="kicker">${e(p.catName)}</div><h${level}><a href="/product/${encodeURIComponent(p.id)}" data-plink>${e(p.name)}</a></h${level}><div class="desc">${e(p.short)}</div>
     <div class="foot"><div class="price">${money(d, p.price)}${p.old ? `<span class="old">${money(d, p.old as number)}</span>` : ''}</div></div></div></div>`
 }
 
@@ -137,7 +138,7 @@ export function shopBody(site: Site, cat = 'all') {
     `<main><div class="page-head"><div class="wrap"><span class="eyebrow">החנות</span><h1>כל המוצרים הדיגיטליים</h1></div></div>
     <section class="block" style="padding-top:26px"><div class="wrap">
     <div class="cats">${cats.map((c) => `<a class="cat-pill ${cat === c.id ? 'active' : ''}" href="${c.id === 'all' ? '/shop' : `/shop?cat=${encodeURIComponent(c.id)}`}" data-cat="${e(c.id)}">${e(c.name)}</a>`).join('')}</div>
-    <div class="grid">${list.map((p) => card(d, p)).join('')}</div></div></section></main>` +
+    <div class="grid">${list.map((p) => card(d, p, 2)).join('')}</div></div></section></main>` +
     footer(site)
   )
 }
@@ -180,7 +181,7 @@ export function contactBody(site: Site) {
       <div class="field"><label for="ctEmail">אימייל</label><input type="email" id="ctEmail" maxlength="200" autocomplete="email" required></div>
       <div class="field"><label for="ctRef">מספר הזמנה (אם יש)</label><input type="text" id="ctRef" maxlength="60"></div>
       <div class="field"><label for="ctMsg">ההודעה</label><textarea id="ctMsg" maxlength="3000" required></textarea></div>
-      <div class="hp" aria-hidden="true"><input type="text" id="ctWebsite" tabindex="-1" autocomplete="off"></div>
+      <div class="hp" aria-hidden="true"><input type="text" id="ctWebsite" tabindex="-1" autocomplete="off" aria-label="שדה מלכודת, להשאיר ריק"></div>
       <button class="btn btn-primary" type="submit" id="ctSend">שליחה</button>
       <p id="ctMsgOut" style="margin-top:12px"></p>
     </form>`

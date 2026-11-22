@@ -362,7 +362,7 @@ admin.put('/pages/:slug', async (c) => {
 })
 
 admin.delete('/pages/:slug', async (c) => {
-  if (['faq', 'terms', 'privacy', 'refunds'].includes(c.req.param('slug'))) return c.json({ success: false, error: 'אי אפשר למחוק עמוד מערכת. אפשר להסתיר אותו.' }, 400)
+  if (['faq', 'terms', 'privacy', 'refunds', 'accessibility'].includes(c.req.param('slug'))) return c.json({ success: false, error: 'אי אפשר למחוק עמוד מערכת. אפשר להסתיר אותו.' }, 400)
   const res = await c.env.DB.prepare('DELETE FROM pages WHERE slug = ?').bind(c.req.param('slug')).run()
   return res.meta.changes ? c.json({ success: true }) : c.json({ success: false, error: 'העמוד לא נמצא' }, 404)
 })
