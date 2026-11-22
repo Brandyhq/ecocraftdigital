@@ -8,6 +8,7 @@ import { faqLd, fillVars, firstText, hasPlaceholders, renderBody } from './lib/c
 import { aboutBody, breadcrumbLd, contactBody, homeBody, organizationLd, page, pageHref, productBody, productLd, shopBody, staticBody, SYSTEM_PAGES } from './lib/ssr'
 import admin from './routes/admin'
 import { catalog } from './routes/catalog'
+import { mockPay } from './routes/mockpay'
 import { publicApi, publicFiles } from './routes/public'
 
 const app = new Hono<AppEnv>()
@@ -20,6 +21,7 @@ app.use('*', async (c, next) => {
 
 app.route('/api/admin', admin)
 app.route('/api/catalog', catalog)
+app.route('/', mockPay)
 app.route('/api', publicApi)
 app.route('/', publicFiles)
 

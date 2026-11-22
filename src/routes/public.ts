@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../env'
+import { getGateway } from '../lib/gateway'
 import { escapeHtml } from '../lib/html'
 import { createPayPalOrder, paypalEnabled, settlePayPalOrder, verifyWebhook } from '../lib/paypal'
 import { getSiteData } from '../lib/site'
@@ -12,6 +13,12 @@ export const publicFiles = new Hono<AppEnv>()
 
 // D1 hands BLOB columns back as an ArrayBuffer or, depending on runtime version, a plain number[].
 const blob = (data: ArrayBuffer | number[]) => (Array.isArray(data) ? new Uint8Array(data) : data)
+
+/** What the checkout page may offer. No gateway means the manual flow (order first, then Bit / PayPal links). */
+publicApi.get('/checkout/config', (c) => {
+  const gw = getGateway(c.env)
+  return c.json({ success: true, gateway: gw ? gw.name : null, ...(gw ? gw.capabilities : {}) })
+})
 
 publicApi.get('/site', async (c) => c.json({ success: true, ...(await getSiteData(c.env.DB)) }))
 
@@ -57,6 +64,9 @@ publicApi.post('/orders', async (c) => {
   if (!isObject(body) || !isObject(body.customer) || !Array.isArray(body.items)) {
     return c.json({ success: false, error: 'בקשה לא תקינה' }, 400)
   }
+  // Terms and the cancellation policy must be accepted explicitly; marketing consent is a separate, optional choice.
+  if (body.terms !== true) return c.json({ success: false, error: 'נא לאשר את התקנון ואת מדיניות הביטולים' }, 400)
+  const marketing = body.marketing === true
   const name = text(body.customer.name, 120)
   const email = text(body.customer.email, 200).toLowerCase()
   const phone = text(body.customer.phone, 30)
@@ -97,8 +107,11 @@ publicApi.post('/orders', async (c) => {
   const customer = await db.prepare('SELECT id FROM customers WHERE email = ?').bind(email).first<{ id: number }>()
 
   const order = await db
-    .prepare(`INSERT INTO orders (customer_id, total_amount, status) VALUES (?, ?, 'pending')`)
-    .bind(customer!.id, total)
+    .prepare(
+      `INSERT INTO orders (customer_id, total_amount, status, terms_accepted_at, marketing_consent, marketing_consent_at)
+       VALUES (?, ?, 'pending', CURRENT_TIMESTAMP, ?, CASE WHEN ? THEN CURRENT_TIMESTAMP END)`
+    )
+    .bind(customer!.id, total, marketing ? 1 : 0, marketing ? 1 : 0)
     .run()
   const orderId = order.meta.last_row_id
   await db.batch(
@@ -127,12 +140,21 @@ publicApi.post('/orders', async (c) => {
     }
   }
 
+  // Embedded payment form of the configured gateway (test mock for now; the real adapter arrives in stage 5).
+  let embedUrl: string | null = null
+  const gateway = getGateway(c.env)
+  if (gateway && !approveUrl) {
+    const payment = await gateway.createPayment({ id: orderId, totalAgorot: Math.round(total * 100) }, text(body.method, 20), new URL(c.req.url).origin)
+    embedUrl = payment.embedUrl
+  }
+
   return c.json({
     success: true,
     order: {
       id: orderId,
       total,
       approveUrl,
+      embedUrl,
       items: lines.map((l) => ({ name: l.name, price: l.price, quantity: l.quantity, paypalUrl: l.paypal_url }))
     }
   })
