@@ -34,7 +34,7 @@ let cart=loadCart(), route={name:'home'}, activeCat='all';
 let orderResult=null, placing=false, checkoutCfg=null, currentOrder=null;
 
 function loadCart(){try{return JSON.parse(localStorage.getItem('ec_cart')||'{}');}catch(e){return{};}}
-function saveCart(){currentOrder=null;try{localStorage.setItem('ec_cart',JSON.stringify(cart));}catch(e){}} /* a changed cart means a new order */
+function saveCart(){dropOrder();try{localStorage.setItem('ec_cart',JSON.stringify(cart));}catch(e){}} /* a changed cart means a new order */
 function cartCount(){return Object.values(cart).reduce((a,b)=>a+b,0);}
 function P(){return DATA.products;}
 function findP(id){return P().find(x=>x.id===id);}
@@ -395,6 +395,22 @@ function closeCart(silent){
 }
 
 /* ---------- checkout: one page, no account ---------- */
+/* An order that is waiting for payment is remembered for this tab, so a reload or a retry does not create a duplicate. */
+function cartSig(){return JSON.stringify(Object.keys(cart).sort().map(k=>[k,cart[k]]));}
+function loadOrder(){try{const o=JSON.parse(sessionStorage.getItem('ec_order')||'null');return o&&o.sig===cartSig()?o.order:null;}catch(e){return null;}}
+function keepOrder(o){currentOrder=o;try{sessionStorage.setItem('ec_order',JSON.stringify({sig:cartSig(),order:o}));}catch(e){}}
+function dropOrder(){currentOrder=null;try{sessionStorage.removeItem('ec_order');}catch(e){}}
+/* Re-render without losing what the shopper already typed (the gateway config can arrive late). */
+function renderKeepingForm(){
+  const v={},c={},y=window.scrollY,a=document.activeElement&&document.activeElement.id;
+  ['coEmail','coName'].forEach(i=>{const e=document.getElementById(i);if(e)v[i]=e.value;});
+  ['coTerms','coMarketing'].forEach(i=>{const e=document.getElementById(i);if(e)c[i]=e.checked;});
+  const sel=a&&document.getElementById(a)?document.getElementById(a).selectionStart:null;
+  render();window.scrollTo(0,y);
+  Object.keys(v).forEach(i=>{const e=document.getElementById(i);if(e)e.value=v[i];});
+  Object.keys(c).forEach(i=>{const e=document.getElementById(i);if(e)e.checked=c[i];});
+  const f=a&&document.getElementById(a);if(f){f.focus();if(typeof sel==='number'&&f.setSelectionRange){try{f.setSelectionRange(sel,sel);}catch(x){}}}
+}
 const MAIL_FIX={'gmial.com':'gmail.com','gmai.com':'gmail.com','gamil.com':'gmail.com','gmail.co':'gmail.com','gmail.con':'gmail.com','hotmial.com':'hotmail.com','hotmai.com':'hotmail.com','hotmail.con':'hotmail.com','yaho.com':'yahoo.com','yahooo.com':'yahoo.com','outlok.com':'outlook.com','walla.co':'walla.co.il'};
 function suggestMail(v){const m=String(v).trim().toLowerCase().match(/^([^@\s]+)@([^@\s]+)$/);return m&&MAIL_FIX[m[2]]?m[1]+'@'+MAIL_FIX[m[2]]:'';}
 function quickMethods(){
@@ -446,11 +462,12 @@ async function submitCheckout(method){
   const po=document.getElementById('placeOrder'), label=po.textContent;
   placing=true;po.disabled=true;po.textContent='שולחת…';
   try{
-    if(!currentOrder)currentOrder=await placeOrder({name,email},{terms:true,marketing,method:method||'card'});
+    if(!currentOrder)currentOrder=loadOrder();
+    if(!currentOrder)keepOrder(await placeOrder({name,email},{terms:true,marketing,method:method||'card'}));
     const o=currentOrder;
     if(o.approveUrl){location.href=o.approveUrl;return;} /* automatic PayPal: the cart is cleared when the customer returns paid */
     if(o.embedUrl){showPayFrame(o);po.hidden=true;return;}
-    orderResult={...o,email};cart={};saveCart();currentOrder=null;nav('success');
+    orderResult={...o,email};cart={};saveCart();nav('success');
   }catch(err){coFail('coEmail',err.message);po.disabled=false;po.textContent=label;}
   finally{placing=false;}
 }
@@ -466,7 +483,7 @@ window.addEventListener('message',e=>{
   if(d.outcome==='pending'){if(st)st.textContent='מאמתים את התשלום...';return;}
   if(d.outcome==='success'&&d.token){
     orderResult={paid:true,downloadUrl:'/download/'+encodeURIComponent(d.token)};
-    cart={};saveCart();currentOrder=null;nav('success');return;
+    cart={};saveCart();nav('success');return;
   }
   /* failed: the order stays open, so retrying reuses it instead of creating a duplicate */
   if(st)st.innerHTML='התשלום לא עבר. העגלה נשמרה. <button type="button" class="linklike" id="retryPay">לנסות שוב</button>';
@@ -583,7 +600,7 @@ function toast(msg,isErr){const t=document.getElementById('toast');t.innerHTML=m
 
 /* ---------- boot ---------- */
 if(DATA.design)applyTheme();
-fetch('/api/checkout/config').then(r=>r.json()).then(d=>{checkoutCfg=d;if(route.name==='checkout'&&!currentOrder)render();}).catch(()=>{});
+fetch('/api/checkout/config').then(r=>r.json()).then(d=>{checkoutCfg=d;if(d.gateway&&route.name==='checkout'&&!currentOrder)renderKeepingForm();}).catch(()=>{});
 /* returning from PayPal: ?paid=<download token> after a captured payment, ?payment=cancelled|failed|pending otherwise */
 const q=new URLSearchParams(location.search);
 let bootToast=null;
