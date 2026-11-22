@@ -371,3 +371,10 @@ body.no-scroll{overflow:hidden}
 .mock-pay{padding:18px}.mock-note{font-size:13px;color:var(--blush-deep);font-weight:700;margin:0 0 12px}
 .mock-actions{display:grid;gap:10px;margin-top:14px}
 #st{font-size:14px;color:var(--ink-soft);margin:12px 0 0}
+
+/* floating WhatsApp button (hidden on the checkout page) */
+.wa-fab{position:fixed;bottom:22px;inset-inline-end:20px;z-index:90;display:inline-flex;align-items:center;gap:10px;padding:13px 18px;border-radius:999px;background:var(--sage);color:var(--cream);font-weight:700;font-size:15px;box-shadow:var(--shadow-lg);transition:background .18s,transform .18s}
+.wa-fab:hover{background:var(--sage-deep);transform:translateY(-2px)}
+.wa-fab svg{flex:0 0 auto}
+.on-checkout .wa-fab{display:none}
+@media (max-width:560px){.wa-fab{padding:13px;bottom:18px;inset-inline-end:14px}.wa-fab span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}

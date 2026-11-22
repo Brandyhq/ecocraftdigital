@@ -77,6 +77,7 @@ function render(){
   window.scrollTo(0,0);
   let h=header();
   const r=route.name;
+  document.body.classList.toggle('on-checkout',r==='checkout');
   if(r==='home')h+=homePage();
   else if(r==='shop')h+=shopPage();
   else if(r==='product')h+=productPage(route.id);
